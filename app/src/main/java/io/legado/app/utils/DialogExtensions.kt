@@ -1,10 +1,12 @@
 package io.legado.app.utils
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Dialog
 import android.os.Build
 import android.view.Gravity
 import android.view.View
+import android.view.Window
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
@@ -133,6 +135,45 @@ private fun Dialog.resolveFloatingDialogWidth(width: Int, height: Int): Int {
         width > maxWidth -> maxWidth
         else -> width
     }
+}
+
+/**
+ * 给窗口申报最高刷新率偏好。
+ *
+ * 阅读页的底部面板（设置/界面/字体/朗读等）都是独立的 Dialog 窗口，
+ * 它们不会走 Activity 的 applyPreferredRefreshRate()，而部分国产 ROM
+ * （实测 ColorOS/OPlusRefreshRateSelector）对「未申报帧率需求」的窗口
+ * 会直接给最低档（40Hz），表现为滑动明显掉帧。
+ * 这里复用与 BaseActivity 相同的解析规则，给 Dialog 窗口补上申报。
+ */
+@SuppressLint("ObsoleteSdkInt")
+fun Window.applyPreferredHighRefreshRate() {
+    if (AppConfig.isEInkMode) return
+    val attr = attributes
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+        attr.preferredRefreshRate = if (AppConfig.useHighRefreshRate) 0f else 60f
+        attributes = attr
+        return
+    }
+    @Suppress("DEPRECATION")
+    val display = decorView.display ?: windowManager?.defaultDisplay ?: return
+    val currentMode = display.mode ?: return
+    val sameResolutionModes = display.supportedModes.filter {
+        it.physicalWidth == currentMode.physicalWidth &&
+            it.physicalHeight == currentMode.physicalHeight
+    }
+    if (sameResolutionModes.isEmpty()) return
+    val targetMode = if (AppConfig.useHighRefreshRate) {
+        sameResolutionModes.maxByOrNull { it.refreshRate }
+    } else {
+        sameResolutionModes
+            .filter { it.refreshRate <= 61f }
+            .maxByOrNull { it.refreshRate }
+            ?: sameResolutionModes.minByOrNull { it.refreshRate }
+    } ?: return
+    attr.preferredDisplayModeId = targetMode.modeId
+    attr.preferredRefreshRate = targetMode.refreshRate
+    attributes = attr
 }
 
 fun Dialog.toggleSystemBar(show: Boolean) {

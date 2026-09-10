@@ -12,6 +12,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.applyUiBodyTypefaceDeep
 import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.lib.theme.dialogSurfaceBackground
+import io.legado.app.utils.applyPreferredHighRefreshRate
 import io.legado.app.utils.dpToPx
 
 
@@ -52,6 +53,8 @@ abstract class BasePrefDialogFragment(
                 it.setBackgroundDrawableResource(R.color.transparent)
             }
         }
+        // 独立对话框窗口需自行申报高刷，否则部分 ROM 会压到最低档导致滑动掉帧
+        dialog?.window?.applyPreferredHighRefreshRate()
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {

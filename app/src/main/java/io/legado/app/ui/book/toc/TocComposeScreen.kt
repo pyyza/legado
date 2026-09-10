@@ -87,6 +87,13 @@ private enum class TocPage {
     Bookmarks
 }
 
+/**
+ * 目录界面全量缓存/标题映射的安全上限。
+ * 目录规则误匹配可能切分出海量章节，全量构建映射会在 256MB 堆上限下 OOM。
+ */
+private const val MAX_TOC_MAP_ENTRIES = 8000
+
+
 @Composable
 fun TocComposeScreen(
     bookUrl: String,
@@ -237,6 +244,16 @@ fun TocComposeScreen(
                 chapterCacheMap = emptyMap()
                 return@LaunchedEffect
             }
+            // 本地书籍(EPUB/TXT)缓存判定恒为 true，无需为超大目录建立全量映射，
+            // 避免规则切分出海量章节时 OOM（此前堆耗尽崩溃点就在 primaryStr 关联构建）
+            if (currentBook.isLocal) {
+                chapterCacheMap = emptyMap()
+                return@LaunchedEffect
+            }
+            if (visibleSnapshot.size > MAX_TOC_MAP_ENTRIES) {
+                chapterCacheMap = emptyMap()
+                return@LaunchedEffect
+            }
             chapterCacheMap = withContext(Dispatchers.IO) {
                 visibleSnapshot.associate { chapter ->
                     chapter.primaryStr() to isChapterCached(currentBook, chapter, cacheSnapshot)
@@ -248,6 +265,12 @@ fun TocComposeScreen(
             val visibleSnapshot = visibleChapters
             val titleSnapshot = titleContext
             if (visibleSnapshot.isEmpty() || titleSnapshot == null) {
+                chapterTitleMap = emptyMap()
+                return@LaunchedEffect
+            }
+            // 超大目录(目录规则误匹配导致)不做全量标题替换映射，直接回退原始标题，
+            // 防止 getDisplayTitle 逐章分配字符串造成 OOM
+            if (visibleSnapshot.size > MAX_TOC_MAP_ENTRIES) {
                 chapterTitleMap = emptyMap()
                 return@LaunchedEffect
             }

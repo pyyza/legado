@@ -45,6 +45,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.ui.book.read.ReadBookActivity
+import io.legado.app.utils.applyPreferredHighRefreshRate
 import io.legado.app.ui.widget.compose.AppDialogStyle
 import io.legado.app.ui.widget.compose.AppThemedStepperSlider
 import io.legado.app.ui.widget.compose.LegadoMiuixSwitch
@@ -112,6 +113,8 @@ abstract class ReaderBottomSheetComposeDialogFragment : ComposeDialogFragment() 
             attr.windowAnimations = if (AppConfig.isEInkMode) 0 else R.style.AnimDialogBottom
             attributes = attr
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            // 底部面板是独立 Dialog 窗口，需自行申报高刷，否则部分 ROM 会压到最低档
+            applyPreferredHighRefreshRate()
         }
     }
 

@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
@@ -25,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -42,8 +45,10 @@ import io.legado.app.ui.widget.compose.toMiuixPalette
 import io.legado.app.lib.theme.titleTypeface
 import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.utils.applyModernWindowStyle
+import io.legado.app.utils.applyPreferredHighRefreshRate
 import io.legado.app.utils.dpToPx
-import io.legado.app.utils.setLayout
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlin.math.min
 
 object ReadRecordComponentConfigDialog {
@@ -54,13 +59,16 @@ object ReadRecordComponentConfigDialog {
         onSaved: (List<ReadRecordComponentItem>) -> Unit
     ) {
         lateinit var dialog: AlertDialog
+        val metrics = context.resources.displayMetrics
+        // 列表限高：窗口高度自适应，仍要给底部「取消/确定」留空间，
+        // 否则列表过高会把按钮顶出可视区域，导致用户找不到保存入口。
         val fixedListHeight = min(
-            420.dpToPx(),
-            (context.resources.displayMetrics.heightPixels * 0.48f).toInt()
-        ).coerceAtLeast(260.dpToPx())
+            320.dpToPx(),
+            (metrics.heightPixels * 0.32f).toInt()
+        ).coerceAtLeast(180.dpToPx())
         val composeView = ComposeView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
-                (context.resources.displayMetrics.widthPixels * 0.9f).toInt(),
+                (metrics.widthPixels * 0.9f).toInt(),
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
@@ -68,7 +76,7 @@ object ReadRecordComponentConfigDialog {
                 LegadoComposeTheme {
                     ReadRecordComponentConfigContent(
                         initialItems = initialItems,
-                        listHeightDp = fixedListHeight / context.resources.displayMetrics.density,
+                        listHeightDp = fixedListHeight / metrics.density,
                         onCancel = { dialog.dismiss() },
                         onSave = { items ->
                             val normalized = items.map { it.copy() }.toMutableList()
@@ -86,7 +94,13 @@ object ReadRecordComponentConfigDialog {
             .setView(composeView)
             .create()
         dialog.setOnShowListener {
-            dialog.setLayout(0.9f, 0.68f)
+            // 高度使用 WRAP_CONTENT 自适应内容，避免固定高度裁掉底部操作按钮
+            dialog.window?.setLayout(
+                (metrics.widthPixels * 0.9f).toInt(),
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            // 独立弹窗需自行申报高刷，否则部分 ROM 会压到最低档导致滑动掉帧
+            dialog.window?.applyPreferredHighRefreshRate()
         }
         dialog.applyModernWindowStyle()
         // AppDialogFrame 自带圆角面板背景，清掉 AlertDialog 自身窗口背景，避免双层背景。
@@ -111,15 +125,20 @@ private fun ReadRecordComponentConfigContent(
     }
     val dialogStyle = rememberAppDialogStyle()
     val palette = dialogStyle.toMiuixPalette()
+    val lazyListState = rememberLazyListState()
+    val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        items.add(to.index, items.removeAt(from.index))
+    }
     AppDialogFrame(
         title = stringResource(R.string.read_record_customize_components),
         message = stringResource(R.string.read_record_components_hint),
         scrollContent = false,
         content = {
             LazyColumn(
+                state = lazyListState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 260.dp, max = listHeightDp.dp),
+                    .height(listHeightDp.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(vertical = 2.dp)
             ) {
@@ -127,24 +146,36 @@ private fun ReadRecordComponentConfigContent(
                     items = items,
                     key = { _, item -> item.type.name }
                 ) { index, item ->
-                    ReadRecordComponentConfigRow(
-                        item = item,
-                        canMoveUp = index > 0,
-                        canMoveDown = index < items.lastIndex,
-                        onToggle = { checked ->
-                            items[index] = item.copy(enabled = checked)
-                        },
-                        onMoveUp = {
-                            if (index > 0) {
-                                items.move(index, index - 1)
+                    ReorderableItem(reorderState, key = item.type.name) {
+                        ReadRecordComponentConfigRow(
+                            item = item,
+                            canMoveUp = index > 0,
+                            canMoveDown = index < items.lastIndex,
+                            onToggle = { checked ->
+                                items[index] = item.copy(enabled = checked)
+                            },
+                            onMoveUp = {
+                                if (index > 0) {
+                                    items.move(index, index - 1)
+                                }
+                            },
+                            onMoveDown = {
+                                if (index < items.lastIndex) {
+                                    items.move(index, index + 1)
+                                }
+                            },
+                            dragHandle = {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_drag_handle),
+                                    contentDescription = stringResource(R.string.read_record_drag_sort),
+                                    tint = palette.secondaryText,
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .draggableHandle()
+                                )
                             }
-                        },
-                        onMoveDown = {
-                            if (index < items.lastIndex) {
-                                items.move(index, index + 1)
-                            }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         },
@@ -172,7 +203,8 @@ private fun ReadRecordComponentConfigRow(
     canMoveDown: Boolean,
     onToggle: (Boolean) -> Unit,
     onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit
+    onMoveDown: () -> Unit,
+    dragHandle: @Composable () -> Unit
 ) {
     val context = LocalContext.current
     val style = rememberAppDialogStyle()
@@ -212,7 +244,9 @@ private fun ReadRecordComponentConfigRow(
                     modifier = Modifier.padding(top = 6.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            dragHandle()
+            Spacer(modifier = Modifier.width(8.dp))
             LegadoMiuixSwitch(
                 checked = item.enabled,
                 palette = palette,

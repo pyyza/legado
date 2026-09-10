@@ -82,6 +82,9 @@ class TextFile(private var book: Book) {
     class MutableRef<String>(var value: String)
     private val lastVolumeTitle = MutableRef("")
 
+    //目录规则可产生的最大章节数，防止规则误匹配(如匹配空串/单字符)时无限切分导致 OOM
+    private val maxTocChapterCount = 65535
+
     /**
      * 获取目录
      */
@@ -204,6 +207,11 @@ class TextFile(private var book: Book) {
                 val matcher: Matcher = pattern.matcher(blockContent)
                 //如果存在相应章节
                 while (matcher.find()) { //获取匹配到的字符在字符串中的起始位置
+                    if (toc.size >= maxTocChapterCount) {
+                        throw IllegalStateException(
+                            "目录规则匹配章节数超过${maxTocChapterCount}，规则可能误匹配，请修改规则"
+                        )
+                    }
                     val chapterStart = matcher.start()
                     //获取章节内容
                     val chapterContent = blockContent.substring(seekPos, chapterStart)

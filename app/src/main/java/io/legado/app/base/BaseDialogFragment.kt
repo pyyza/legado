@@ -22,6 +22,7 @@ import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.theme.applyUiBodyTypefaceDeep
 import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.lib.theme.dialogSurfaceBackground
+import io.legado.app.utils.applyPreferredHighRefreshRate
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.setBackgroundKeepPadding
 import kotlinx.coroutines.CoroutineScope
@@ -75,6 +76,9 @@ abstract class BaseDialogFragment(
                 it.setBackgroundDrawableResource(R.color.transparent)
             }
         }
+        // 对话框是独立窗口，不会继承 Activity 的高刷申报，需自行声明，
+        // 否则部分 ROM（如 ColorOS）会把未申报帧率需求的窗口压到最低档（40Hz）
+        dialog?.window?.applyPreferredHighRefreshRate()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

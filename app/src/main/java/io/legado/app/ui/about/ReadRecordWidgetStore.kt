@@ -68,7 +68,18 @@ object ReadRecordWidgetStore {
     fun loadRecentSnapshots(): List<ReadRecentVisualSnapshot> {
         val raw = appCtx.getPrefString(PreferKey.readRecordRecentSnapshots).orEmpty()
         if (raw.isBlank()) return emptyList()
-        return GSON.fromJsonArray<ReadRecentVisualSnapshot>(raw).getOrDefault(emptyList())
+        return runCatching {
+            GSON.fromJsonArray<ReadRecentVisualSnapshot>(raw).getOrDefault(emptyList())
+                // 导入的备份可能包含 name/author 为 null 的旧格式条目
+                // (GSON 反序列化会绕过 Kotlin 非空默认值)，先过滤再规范化
+                .filter { !it.name.isNullOrBlank() }
+                .map { snapshot ->
+                    snapshot.copy(
+                        name = snapshot.name.trim(),
+                        author = snapshot.author.orEmpty().trim()
+                    )
+                }
+        }.getOrDefault(emptyList())
     }
 
     private fun saveRecentSnapshots(items: List<ReadRecentVisualSnapshot>) {
@@ -153,8 +164,8 @@ object ReadRecordWidgetStore {
         .flatMap { appDb.bookDao.getLatestDisplayInfosByNames(it) }
 
     private fun ReadRecentVisualSnapshot.identityKey(): String {
-        val normalizedName = name.trim()
-        val normalizedAuthor = author.trim()
+        val normalizedName = name.orEmpty().trim()
+        val normalizedAuthor = author.orEmpty().trim()
         return if (normalizedName.isNotEmpty()) {
             "$normalizedName\n$normalizedAuthor"
         } else {
@@ -165,8 +176,8 @@ object ReadRecordWidgetStore {
     private fun ReadRecentVisualSnapshot.sameBook(name: String, author: String?): Boolean {
         val normalizedName = name.trim()
         if (normalizedName.isEmpty()) return false
-        return this.name.trim() == normalizedName &&
-            this.author.trim() == author.orEmpty().trim()
+        return this.name.orEmpty().trim() == normalizedName &&
+            this.author.orEmpty().trim() == author.orEmpty().trim()
     }
 
     private fun updateAllWidgets() {

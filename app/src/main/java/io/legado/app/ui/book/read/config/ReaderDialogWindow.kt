@@ -6,6 +6,7 @@ import android.view.Window
 import android.view.WindowManager
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
+import io.legado.app.utils.applyPreferredHighRefreshRate
 
 fun Window.applyReaderBottomSheetWindow(
     height: Int = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -19,4 +20,6 @@ fun Window.applyReaderBottomSheetWindow(
     attr.windowAnimations = if (AppConfig.isEInkMode) 0 else R.style.AnimDialogBottom
     attributes = attr
     setLayout(ViewGroup.LayoutParams.MATCH_PARENT, height)
+    // 底部面板是独立 Dialog 窗口，需自行申报高刷，否则部分 ROM 会压到最低档
+    applyPreferredHighRefreshRate()
 }

@@ -11,6 +11,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.DialogFragment
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
+import io.legado.app.utils.applyPreferredHighRefreshRate
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.setBackgroundKeepPadding
@@ -84,6 +85,9 @@ abstract class ComposeDialogFragment : DialogFragment() {
         } else {
             setLayout(dialogWidth, dialogHeight)
         }
+        // 对话框是独立窗口，不会继承 Activity 的高刷申报，需自行声明，
+        // 否则部分 ROM（如 ColorOS）会把未申报帧率需求的窗口压到最低档（40Hz）
+        dialog?.window?.applyPreferredHighRefreshRate()
     }
 
     private fun handleDialogBack(): Boolean {
