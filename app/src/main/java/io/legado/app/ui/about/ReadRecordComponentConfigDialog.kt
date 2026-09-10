@@ -1,6 +1,8 @@
 package io.legado.app.ui.about
 
 import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.compose.foundation.clickable
@@ -66,9 +68,12 @@ object ReadRecordComponentConfigDialog {
             320.dpToPx(),
             (metrics.heightPixels * 0.32f).toInt()
         ).coerceAtLeast(180.dpToPx())
+        val dialogWidth = (metrics.widthPixels * 0.9f).toInt()
         val composeView = ComposeView(context).apply {
+            // 宽度交给窗口（MATCH_PARENT），避免「内容 90% + 窗口自身再按内容量一次」
+            // 出现两套宽度，show 之后窗口尺寸跳变
             layoutParams = ViewGroup.LayoutParams(
-                (metrics.widthPixels * 0.9f).toInt(),
+                ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
@@ -93,20 +98,22 @@ object ReadRecordComponentConfigDialog {
         dialog = AlertDialog.Builder(context)
             .setView(composeView)
             .create()
-        dialog.setOnShowListener {
-            // 高度使用 WRAP_CONTENT 自适应内容，避免固定高度裁掉底部操作按钮
-            dialog.window?.setLayout(
-                (metrics.widthPixels * 0.9f).toInt(),
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-            // 独立弹窗需自行申报高刷，否则部分 ROM 会压到最低档导致滑动掉帧
-            dialog.window?.applyPreferredHighRefreshRate()
-        }
+        // 窗口尺寸 / 背景 / 刷新率申报全部在 show() 之前设好。
+        // 入场动画是 alpha + scale(0.94→1)，缩放圆心按「动画开始时的窗口尺寸」计算；
+        // 旧写法在 setOnShowListener 里才 setLayout，动画播放途中窗口尺寸突变，
+        // 圆心失效 → 视觉上就是「框自己左右颤动一下」。
+        val window = dialog.window
+        window?.setLayout(dialogWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
         dialog.applyModernWindowStyle()
         // AppDialogFrame 自带圆角面板背景，清掉 AlertDialog 自身窗口背景，避免双层背景。
-        dialog.window?.setBackgroundDrawable(
-            android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
-        )
+        window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        // 高刷申报同样提前到 show() 前：窗口挂载时一次性带上，
+        // 避免入场动画途中再改窗口属性（独立窗口需自行申报，否则 ColorOS 压到 40Hz）
+        if (window?.windowManager != null) {
+            window.applyPreferredHighRefreshRate()
+        } else {
+            dialog.setOnShowListener { dialog.window?.applyPreferredHighRefreshRate() }
+        }
         dialog.show()
     }
 }

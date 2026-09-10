@@ -91,11 +91,18 @@ android {
             if (project.hasProperty("RELEASE_STORE_FILE")) {
                 signingConfig signingConfigs.myConfig
             }
-            applicationIdSuffix '.Archive'
+            // 自编译版包名：io.legado.app.Archivepersonal
+            // 上游官方版（Rimchars/legado 阅读Archive）固定占用 io.legado.app.Archive，
+            // 若沿用同一后缀会因「同包名 + 不同签名」无法共存安装，故此处改为专属后缀。
+            applicationIdSuffix '.Archivepersonal'
             if (getApplicationIdSuffix() == '.releaseA') {
                 manifestPlaceholders.put("app_name", "@string/app_name_a")
             } else if (getApplicationIdSuffix() == '.releaseS') {
                 manifestPlaceholders.put("app_name", "@string/app_name_s")
+            } else if (getApplicationIdSuffix() == '.Archivepersonal') {
+                // 自编译版：与上游官方版（桌面名「阅读」）共存安装，
+                // 桌面图标显示「阅读Archive」以免两个图标分不清
+                manifestPlaceholders.put("app_name", "@string/app_name_sigma")
             } else {
                 manifestPlaceholders.put("app_name", "@string/app_launcher_name")
             }

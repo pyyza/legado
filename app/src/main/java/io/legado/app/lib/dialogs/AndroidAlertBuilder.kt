@@ -12,6 +12,7 @@ import io.legado.app.lib.theme.applyUiBodyTypefaceDeep
 import io.legado.app.lib.theme.dialogSurfaceBackground
 import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.utils.applyTint
+import io.legado.app.utils.applyPreferredHighRefreshRate
 
 internal class AndroidAlertBuilder(override val ctx: Context) : AlertBuilder<AlertDialog> {
     private val builder = AlertDialog.Builder(ctx)
@@ -150,6 +151,8 @@ internal class AndroidAlertBuilder(override val ctx: Context) : AlertBuilder<Ale
         val dialog = builder.create()
         dialog.setOnShowListener {
             dialog.window?.decorView?.applyUiBodyTypefaceDeep(ctx.uiTypeface())
+            // build() 出来的对话框尚未挂载，Display 还解析不到，只能等挂载后再申报高刷
+            dialog.window?.applyPreferredHighRefreshRate()
         }
         dialog.window?.run {
             if (AppConfig.isEInkMode) {
@@ -184,6 +187,9 @@ internal class AndroidAlertBuilder(override val ctx: Context) : AlertBuilder<Ale
                 setBackgroundDrawable(ctx.dialogSurfaceBackground)
             }
         }
+        // 所有走 alert{} / alertDialog{} 的对话框在此统一收口申报高刷，
+        // 新增弹窗无需逐个处理（独立窗口不申报会被 ROM 压到 40Hz）
+        dialog.window?.applyPreferredHighRefreshRate()
         return dialog
     }
 }

@@ -30,6 +30,7 @@ import io.legado.app.lib.theme.applyUiSubtleButtonStyle
 import io.legado.app.lib.theme.applyUiTitleTypeface
 import io.legado.app.lib.theme.dialogSurfaceBackground
 import io.legado.app.lib.theme.uiTypeface
+import io.legado.app.utils.applyPreferredHighRefreshRate
 import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.toastOnUi
@@ -94,6 +95,9 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                 (resources.displayMetrics.widthPixels * 0.92f).toInt(),
                 (resources.displayMetrics.heightPixels * 0.72f).toInt()
             )
+            // 独立窗口需自行申报高刷：本类继承原生 DialogFragment，
+            // 不走 BaseDialogFragment，不申报会被 ROM 压到最低档（40Hz）。
+            applyPreferredHighRefreshRate()
         }
     }
 
