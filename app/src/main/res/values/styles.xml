@@ -21,7 +21,7 @@
     <!-- Welcome主题 -->
     <style name="AppTheme.Welcome" parent="Base.AppTheme">
         <item name="android:windowNoTitle">true</item>
-        <item name="android:windowBackground">@drawable/bg_welcome_preview</item>
+        <item name="android:windowBackground">@color/background</item>
         <item name="android:colorBackground">@color/background</item>
     </style>
 

@@ -844,6 +844,7 @@ object Restore {
             PreferKey.mangaColorFilter,
             PreferKey.contentSelectMenuConfig,
             PreferKey.contentSelectDefaultOpen,
+            PreferKey.contentSelectHiddenProcessTextApps,
             PreferKey.contentSelectSearchEngines,
             PreferKey.contentSelectSearchEngineId,
             PreferKey.advancedTitleConfig,

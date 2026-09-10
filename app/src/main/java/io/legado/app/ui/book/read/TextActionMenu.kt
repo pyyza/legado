@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.app.SearchManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ResolveInfo
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
@@ -16,7 +15,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.PopupWindow
-import androidx.annotation.RequiresApi
 import androidx.appcompat.view.SupportMenuInflater
 import androidx.appcompat.view.menu.MenuBuilder
 import androidx.appcompat.view.menu.MenuItemImpl
@@ -81,7 +79,7 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
     PopupWindow(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT) {
 
     private val composeView = ComposeView(context)
-    private val allMenuItems: List<MenuItemImpl>
+    private val menuItems: List<MenuItemImpl>
     private var menuActions by mutableStateOf<List<TextMenuAction>>(emptyList())
     private var popupWidthPx by mutableIntStateOf(1)
     private var popupHeightPx by mutableIntStateOf(1)
@@ -113,12 +111,8 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
         }
 
         val myMenu = MenuBuilder(context)
-        val otherMenu = MenuBuilder(context)
         SupportMenuInflater(context).inflate(R.menu.content_select_action, myMenu)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            onInitializeMenu(otherMenu)
-        }
-        allMenuItems = myMenu.visibleItems + otherMenu.visibleItems
+        menuItems = myMenu.visibleItems
 
         composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
         composeView.setContent {
@@ -163,21 +157,38 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
     }
 
     private fun filteredMenuActions(): List<TextMenuAction> {
-        return allMenuItems.mapNotNull { item ->
-            val actionId = menuItemToActionId(item.itemId) ?: return@mapNotNull null
-            if (!configuredActionIds.contains(actionId)) return@mapNotNull null
-            TextMenuAction(
-                itemId = item.itemId,
-                actionId = actionId,
-                title = if (item.itemId == R.id.menu_aloud &&
-                    (BaseReadAloudService.isRun || AppConfig.contentSelectSpeakMod == 1)
-                ) {
-                    context.getString(R.string.read_aloud_from_here)
-                } else {
-                    item.title?.toString().orEmpty()
-                },
-                intent = item.intent
-            )
+        return buildList {
+            menuItems.forEach { item ->
+                val actionId = menuItemToActionId(item.itemId) ?: return@forEach
+                if (!configuredActionIds.contains(actionId)) return@forEach
+                add(
+                    TextMenuAction(
+                        itemId = item.itemId,
+                        actionId = actionId,
+                        title = if (item.itemId == R.id.menu_aloud &&
+                            (BaseReadAloudService.isRun || AppConfig.contentSelectSpeakMod == 1)
+                        ) {
+                            context.getString(R.string.read_aloud_from_here)
+                        } else {
+                            item.title?.toString().orEmpty()
+                        },
+                        intent = item.intent
+                    )
+                )
+            }
+            if (configuredActionIds.contains(ContentSelectConfig.ACTION_PROCESS_TEXT)) {
+                // 其他应用（Android 6.0+ 的 ACTION_PROCESS_TEXT），由独立模块提供
+                ProcessTextAppsManager.visibleApps(context).forEach { app ->
+                    add(
+                        TextMenuAction(
+                            itemId = Menu.NONE,
+                            actionId = ContentSelectConfig.ACTION_PROCESS_TEXT,
+                            title = app.label,
+                            intent = ProcessTextAppsManager.createProcessTextIntentForApp(app)
+                        )
+                    )
+                }
+            }
         }
     }
 
@@ -359,41 +370,6 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
                     }
                 }
             }
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun createProcessTextIntent(): Intent {
-        return Intent()
-            .setAction(Intent.ACTION_PROCESS_TEXT)
-            .setType("text/plain")
-    }
-
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun getSupportedActivities(): List<ResolveInfo> {
-        return context.packageManager
-            .queryIntentActivities(createProcessTextIntent(), 0)
-    }
-
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun createProcessTextIntentForResolveInfo(info: ResolveInfo): Intent {
-        return createProcessTextIntent()
-            .putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, false)
-            .setClassName(info.activityInfo.packageName, info.activityInfo.name)
-    }
-
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun onInitializeMenu(menu: Menu) {
-        kotlin.runCatching {
-            var menuItemOrder = 100
-            for (resolveInfo in getSupportedActivities()) {
-                menu.add(
-                    Menu.NONE, Menu.NONE,
-                    menuItemOrder++, resolveInfo.loadLabel(context.packageManager)
-                ).intent = createProcessTextIntentForResolveInfo(resolveInfo)
-            }
-        }.onFailure {
-            context.toastOnUi("Text action menu init error:${it.localizedMessage}")
         }
     }
 

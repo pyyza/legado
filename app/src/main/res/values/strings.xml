@@ -205,6 +205,9 @@
     <string name="content_select_menu_config">Long-press Menu Editor</string>
     <string name="content_select_menu_config_summary">Configure long-press actions and default open action</string>
     <string name="content_select_actions">Long-press actions</string>
+    <string name="content_select_other_apps">Other apps</string>
+    <string name="content_select_other_apps_selected">%1$d/%2$d shown</string>
+    <string name="content_select_other_apps_empty">No apps support text processing (Android 6.0+ required)</string>
     <string name="content_select_default_open">Default open</string>
     <string name="content_select_speak_from_selection">Switched to continuous reading from selection</string>
     <string name="content_select_speak_selected">Switched to reading selected text</string>

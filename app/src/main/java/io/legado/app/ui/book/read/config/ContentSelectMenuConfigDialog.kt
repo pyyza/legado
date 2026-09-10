@@ -40,6 +40,7 @@ import io.legado.app.R
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.ui.book.read.ContentSelectConfig
+import io.legado.app.ui.book.read.ProcessTextAppsManager
 import io.legado.app.ui.widget.compose.AppDialogFrame
 import io.legado.app.ui.widget.compose.AppDialogStyle
 import io.legado.app.ui.widget.compose.ComposeDialogFragment
@@ -91,6 +92,13 @@ class ContentSelectMenuConfigDialog : ComposeDialogFragment() {
                 var defaultOpen by rememberSaveable {
                     mutableStateOf(initialDefaultOpen)
                 }
+                // 其他应用：每个应用的隐藏状态（读取/保存）
+                val initialHiddenKeys = remember {
+                    ProcessTextAppsManager.hiddenAppKeys(requireContext())
+                }
+                var hiddenAppKeys by rememberSaveable {
+                    mutableStateOf(initialHiddenKeys)
+                }
                 val style = rememberAppDialogStyle()
                 CompositionLocalProvider(
                     LocalTextStyle provides LocalTextStyle.current.copy(fontFamily = style.bodyFontFamily)
@@ -101,6 +109,7 @@ class ContentSelectMenuConfigDialog : ComposeDialogFragment() {
                             ContentSelectMenuContent(
                                 selectedActions = selectedActions.toSet(),
                                 defaultOpen = defaultOpen,
+                                hiddenAppKeys = hiddenAppKeys,
                                 style = style,
                                 onActionToggle = { actionId ->
                                     selectedActions = selectedActions
@@ -112,7 +121,16 @@ class ContentSelectMenuConfigDialog : ComposeDialogFragment() {
                                         }
                                         .toList()
                                 },
-                                onDefaultOpenChange = { defaultOpen = it }
+                                onDefaultOpenChange = { defaultOpen = it },
+                                onAppHiddenToggle = { key ->
+                                    hiddenAppKeys = hiddenAppKeys
+                                        .toMutableSet()
+                                        .apply {
+                                            if (!add(key)) {
+                                                remove(key)
+                                            }
+                                        }
+                                }
                             )
                         },
                         actions = {
@@ -129,7 +147,11 @@ class ContentSelectMenuConfigDialog : ComposeDialogFragment() {
                                 palette = palette,
                                 primary = true,
                                 onClick = {
-                                    saveConfig(selectedActions.toSet(), defaultOpen)
+                                    saveConfig(
+                                        selectedActions.toSet(),
+                                        defaultOpen,
+                                        hiddenAppKeys
+                                    )
                                 },
                                 cornerRadius = style.actionRadius
                             )
@@ -142,7 +164,8 @@ class ContentSelectMenuConfigDialog : ComposeDialogFragment() {
 
     private fun saveConfig(
         actions: Set<String>,
-        defaultOpen: String
+        defaultOpen: String,
+        hiddenAppKeys: Set<String>
     ) {
         val selected = sanitizeActionIds(actions).toMutableSet()
         if (defaultOpen.isNotEmpty()) {
@@ -153,6 +176,10 @@ class ContentSelectMenuConfigDialog : ComposeDialogFragment() {
         }
         requireContext().putPrefStringSet(PreferKey.contentSelectActions, selected)
         requireContext().putPrefString(PreferKey.contentSelectDefaultOpen, defaultOpen)
+        requireContext().putPrefStringSet(
+            PreferKey.contentSelectHiddenProcessTextApps,
+            hiddenAppKeys.toMutableSet()
+        )
         postEvent(EventBus.CONTENT_SELECT_MENU_CONFIG_CHANGED, true)
         dismissAllowingStateLoss()
     }
@@ -161,12 +188,15 @@ class ContentSelectMenuConfigDialog : ComposeDialogFragment() {
     private fun ContentSelectMenuContent(
         selectedActions: Set<String>,
         defaultOpen: String,
+        hiddenAppKeys: Set<String>,
         style: AppDialogStyle,
         onActionToggle: (String) -> Unit,
-        onDefaultOpenChange: (String) -> Unit
+        onDefaultOpenChange: (String) -> Unit,
+        onAppHiddenToggle: (String) -> Unit
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             SectionTitle(
@@ -179,6 +209,14 @@ class ContentSelectMenuConfigDialog : ComposeDialogFragment() {
                     checked = item.id in selectedActions,
                     style = style,
                     onClick = { onActionToggle(item.id) }
+                )
+            }
+            if (selectedActions.contains(ContentSelectConfig.ACTION_PROCESS_TEXT)) {
+                // 其他应用：可展开的子列表由独立模块提供，便于上游更新时整体迁移
+                ProcessTextAppsConfigSection(
+                    hiddenAppKeys = hiddenAppKeys,
+                    style = style,
+                    onAppHiddenToggle = onAppHiddenToggle
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -299,7 +337,8 @@ class ContentSelectMenuConfigDialog : ComposeDialogFragment() {
             ActionItem(ContentSelectConfig.ACTION_GENERATE_IMAGE, R.string.ai_image_generate),
             ActionItem(ContentSelectConfig.ACTION_SHARE_IMAGE, R.string.share)
         )
-        private val knownActionIds = actionItems.map { it.id }.toSet()
+        private val knownActionIds =
+            actionItems.map { it.id }.toSet() + ContentSelectConfig.ACTION_PROCESS_TEXT
 
         private val defaultOpenItems = listOf(
             DefaultOpenItem("", R.string.default_none),

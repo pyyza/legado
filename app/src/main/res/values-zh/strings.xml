@@ -204,6 +204,9 @@
     <string name="content_select_menu_config">正文长按条编辑</string>
     <string name="content_select_menu_config_summary">配置长按菜单动作与默认打开项</string>
     <string name="content_select_actions">长按动作</string>
+    <string name="content_select_other_apps">其他应用</string>
+    <string name="content_select_other_apps_selected">已显示 %1$d/%2$d 个应用</string>
+    <string name="content_select_other_apps_empty">没有支持处理文本的应用（需要 Android 6.0+）</string>
     <string name="content_select_default_open">默认打开</string>
     <string name="content_select_speak_from_selection">已切换为从选择处开始连续朗读</string>
     <string name="content_select_speak_selected">已切换为朗读选择内容</string>

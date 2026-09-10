@@ -308,6 +308,7 @@ object PreferKey {
     const val contentSelectMenuConfig = "contentSelectMenuConfig"
     const val contentSelectActions = "contentSelectActions"
     const val contentSelectDefaultOpen = "contentSelectDefaultOpen"
+    const val contentSelectHiddenProcessTextApps = "contentSelectHiddenProcessTextApps"
     const val contentSelectSearchEngines = "contentSelectSearchEngines"
     const val contentSelectSearchEngineId = "contentSelectSearchEngineId"
     const val advancedTitleConfig = "advancedTitleConfig"

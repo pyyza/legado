@@ -28,20 +28,17 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>(imageBg = fals
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        val welcomeShowTime = getPrefInt(PreferKey.welcomeShowTime, 0)
         if (intent.flags and Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT != 0) {
             // 避免从桌面启动程序后，会重新实例化入口类的activity
             finish()
+        } else if (welcomeShowTime == 0) {
+            // 未开启欢迎页：不绘制欢迎内容，直接进主界面，避免多余开屏停留
+            hideWelcomeContent()
+            startMainActivity()
         } else {
-            val welcomeShowTime = getPrefInt(PreferKey.welcomeShowTime, 0)
-            if (welcomeShowTime == 0) {
-                startMainActivity()
-            } else {
-                binding.root.postDelayed(welcomeShowTime.toLong()) { startMainActivity() }
-            }
+            binding.root.postDelayed(welcomeShowTime.toLong()) { startMainActivity() }
         }
-        binding.tvLegado.visibility = View.GONE
-        binding.ivBook.visibility = View.GONE
-        binding.tvGzh.visibility = View.GONE
     }
 
     override fun setupSystemBar() {
@@ -50,8 +47,10 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>(imageBg = fals
         upNavigationBarColor()
     }
 
-    override fun upBackgroundImage() {
-        window.decorView.setBackgroundResource(R.drawable.bg_welcome_preview)
+    private fun hideWelcomeContent() {
+        binding.tvLegado.visibility = View.GONE
+        binding.ivBook.visibility = View.GONE
+        binding.tvGzh.visibility = View.GONE
     }
 
     private fun startMainActivity() {
