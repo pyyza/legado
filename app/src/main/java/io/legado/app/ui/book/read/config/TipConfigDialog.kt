@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.read.config
 
 import android.os.Bundle
+import android.content.Intent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
@@ -16,6 +17,7 @@ import io.legado.app.help.config.ReadTipConfig
 import io.legado.app.help.config.ReaderInfoTemplate
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
+import io.legado.app.ui.config.AdvancedTitleManageActivity
 import io.legado.app.utils.checkByIndex
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
@@ -109,6 +111,12 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         rgTitleMode.setOnCheckedChangeListener { _, checkedId ->
             ReadBookConfig.titleMode = rgTitleMode.getIndexById(checkedId)
             postEvent(EventBus.UP_CONFIG, arrayListOf(5))
+        }
+        // 独立入口：任意标题模式下都可进入高级标题管理页
+        llAdvancedTitleManage.setOnClickListener {
+            startActivity(
+                Intent(requireContext(), AdvancedTitleManageActivity::class.java)
+            )
         }
         dsbTitleSize.onChanged = {
             ReadBookConfig.titleSize = it

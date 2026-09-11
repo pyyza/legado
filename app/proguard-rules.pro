@@ -70,6 +70,11 @@
 -keep class io.legado.app.model.blockrule.BlockRule{*;}
 # 书籍缓存索引数据类：GSON 写入 bookCacheIndex.json（常规备份与「书籍缓存选择」单独导出 ZIP 共用），
 # 不在 data.entities 包内，字段名被混淆会导致正式包恢复缓存时索引解析失败、.nb 文件无法复制
+# 高级标题（Lottie 章节标题）：AdvancedTitleConfig.SplitRule 通过 GSON 持久化到
+# SharedPreferences（advancedTitleConfig），字段名被混淆会导致升级/跨版本反序列化时
+# delimiter/regex 变为 null，渲染章节标题时触发 String.length() NPE（第 140 行 ifEmpty）。
+# 注意：ChapterProvider 只是捕获并记录该异常（ReadBook.kt 日志 tag），并非序列化模型，无需 keep。
+-keep class io.legado.app.help.config.AdvancedTitle**{*;}
 -keep class io.legado.app.help.storage.BookCacheIndex{*;}
 -keep class io.legado.app.help.storage.ChapterCacheInfo{*;}
 # 缓存清单数据类：GSON 反射读写 book_cache/<书>/cache_manifest.json，

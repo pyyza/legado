@@ -400,4 +400,16 @@ object PreferKey {
 
     /** 被关闭的智能标签规则 id 集合（黑名单，未记录即开启） */
     const val smartTagsDisabledRules = "smartTagsDisabledRules"
+
+    // ==================== 高级标题（Lottie 章节标题）====================
+    /** 全局分割规则，JSON AdvancedTitleConfig.SplitRule */
+    const val advancedTitleConfig = "advancedTitleConfig"
+    /** 兼容旧版的单条 Lottie JSON（同时作为当前激活项的恢复副本） */
+    const val advancedTitleLottieJson = "advancedTitleLottieJson"
+    /** 兼容旧版的单条 Lottie 文件路径 */
+    const val advancedTitleLottiePath = "advancedTitleLottiePath"
+    /** 当前激活的高级标题包 id */
+    const val advancedTitlePackage = "advancedTitlePackage"
+    /** 高级标题占位高度系数，30..120 */
+    const val advancedTitleHeightFactor = "advancedTitleHeightFactor"
 }
