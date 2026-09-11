@@ -61,6 +61,15 @@ data class TextPage(
     var hasAnimatedContent = false
     var isResumed = false
 
+    /**
+     * 高级标题（Lottie）在本页的占位块。
+     *
+     * Max 没有 Archive 的 EPUB 原生指令管线（`epubEmbeddedBlocks`），
+     * 因此用这个轻量字段承载 Lottie 的定位与 JSON，
+     * 由 PageView 用叠加的 LottieAnimationView 负责实际渲染。
+     */
+    internal var advancedTitleBlock: AdvancedTitleBlock? = null
+
     @JvmField
     var textChapter = emptyTextChapter
     val pageSize get() = textChapter.pageSize
@@ -371,10 +380,29 @@ data class TextPage(
     }
 
     fun upRenderHeight() {
+        if (lines.isEmpty()) {
+            // 整页只有高级标题（例如空正文章节）时不能访问 lines.last()
+            renderHeight = if (advancedTitleBlock != null) ChapterProvider.viewHeight else 0
+            return
+        }
         renderHeight = ceil(lines.last().lineBottom).toInt()
+        advancedTitleBlock?.let { block ->
+            renderHeight = max(renderHeight, ceil(block.offsetY + block.height).toInt())
+        }
         if (leftLineSize > 0 && leftLineSize != lines.size) {
             val leftHeight = ceil(lines[leftLineSize - 1].lineBottom).toInt()
             renderHeight = max(renderHeight, leftHeight)
         }
     }
+
+    /**
+     * 高级标题占位块：页面坐标系下的位置与尺寸 + 已替换变量的 Lottie JSON。
+     */
+    internal data class AdvancedTitleBlock(
+        val offsetX: Float,
+        val offsetY: Float,
+        val width: Float,
+        val height: Float,
+        val json: String
+    )
 }
