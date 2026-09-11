@@ -68,6 +68,11 @@
 # 屏蔽规则数据类：通过 GSON 持久化到 SharedPreferences（exploreBlockRuleItems），
 # 并随 config.xml 参与备份恢复，字段名被混淆会导致升级后规则失效、剪贴板导出键名乱码
 -keep class io.legado.app.model.blockrule.BlockRule{*;}
+# 高级标题（Lottie 章节标题）：AdvancedTitleConfig.SplitRule 通过 GSON 持久化到
+# SharedPreferences（advancedTitleConfig），字段名被混淆会导致升级/跨版本反序列化时
+# delimiter/regex 变为 null，渲染章节标题时触发 String.length() NPE（第 140 行 ifEmpty）。
+# 注意：ChapterProvider 只是捕获并记录该异常（ReadBook.kt 日志 tag），并非序列化模型，无需 keep。
+-keep class io.legado.app.help.config.AdvancedTitle**{*;}
 -keep class io.legado.app.help.storage.BookCacheIndex{*;}
 -keep class io.legado.app.help.storage.ChapterCacheInfo{*;}
 -keep class io.legado.app.ui.book.cacheSelector.BookCacheIndex{*;}

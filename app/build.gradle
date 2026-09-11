@@ -117,7 +117,8 @@ android {
             if (resolvedReleaseStoreFile != null) {
                 signingConfig = signingConfigs.myConfig
             }
-            applicationIdSuffix = '.release'
+            // release 独立包名，与原 Max（io.legado.app.yuedu）共存
+            applicationIdSuffix = '.Maxpersonal'
 
             minifyEnabled = true
             shrinkResources = true
@@ -349,6 +350,7 @@ dependencies {
     
     //Svg
     implementation(libs.androidsvg)
+    implementation(libs.lottie)
     //Glide svg plugin - 排除Glide注解避免KSP冲突
     implementation(libs.glide.svg) {
         exclude group: 'com.github.bumptech.glide', module: 'annotations'

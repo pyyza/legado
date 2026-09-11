@@ -22,6 +22,7 @@ import io.legado.app.help.book.BookContent
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.getBookSource
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.AdvancedTitleConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.ImageProvider
@@ -36,6 +37,7 @@ import io.legado.app.utils.dpToPx
 import io.legado.app.utils.fastSum
 import io.legado.app.utils.getTextWidthsCompat
 import io.legado.app.utils.splitNotBlank
+import org.json.JSONObject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -539,7 +541,19 @@ class TextChapterLayout(
         if (titleMode != 2 || bookChapter.isVolume || contents.isEmpty()) {
             var firstLine = true
             // 标题非隐藏
-            displayTitle.splitNotBlank("\n").forEach { text ->
+            //高级标题：整块 Lottie 占位，正文从标题下方开始排；失败时回退到普通标题
+            val advancedTitleHandled = titleMode == AdvancedTitleConfig.TITLE_MODE_ADVANCED &&
+                !bookChapter.isVolume &&
+                contents.isNotEmpty() &&
+                setTypeAdvancedTitle(book, displayTitle)
+            val advancedTitleFallback = titleMode == AdvancedTitleConfig.TITLE_MODE_ADVANCED &&
+                !advancedTitleHandled
+            val titleLines: Array<String> = if (advancedTitleHandled) {
+                emptyArray()
+            } else {
+                displayTitle.splitNotBlank("\n")
+            }
+            titleLines.forEach { text ->
                 val srcList = LinkedList<String>()
                 val clickList = LinkedList<String?>()
                 val titleImg = if (firstLine) {
@@ -628,11 +642,14 @@ class TextChapterLayout(
                     isTitle = true,
                     emptyContent = contents.isEmpty(),
                     isVolumeTitle = bookChapter.isVolume,
+                    forceMiddleTitle = advancedTitleFallback
                 )
                 pendingTextPage.lines.last().isParagraphEnd = true
                 stringBuilder.append("\n")
             }
-            durY += titleBottomSpacing
+            if (!advancedTitleHandled) {
+                durY += titleBottomSpacing
+            }
 
             // 如果是单图模式且当前页有内容，强制分页
             if (isSingleImageStyle && pendingTextPage.lines.isNotEmpty() && contents.isNotEmpty()) {
@@ -1567,6 +1584,7 @@ class TextChapterLayout(
         isFirstLine: Boolean = true,
         emptyContent: Boolean = false,
         isVolumeTitle: Boolean = false,
+        forceMiddleTitle: Boolean = false,
         srcList: LinkedList<String>? = null,
         clickList: LinkedList<String?>?,
         bodyHighlightStyles: BodyHighlightStyles? = null,
@@ -1690,6 +1708,7 @@ class TextChapterLayout(
                             isMiddleTitle ||
                                 emptyContent ||
                                 isVolumeTitle ||
+                                forceMiddleTitle ||
                                 imageStyle?.uppercase() == Book.imgStyleSingle -> {
                                 (visibleWidth - desiredWidth) / 2
                             }
@@ -2478,7 +2497,103 @@ class TextChapterLayout(
         }
     }
 
+    /**
+     * 高级标题：把标题整块作为 Lottie 占位写入当前页，正文从占位下方开始排。
+     *
+     * 与 Archive 的差异：Max 没有 EPUB 原生指令管线，这里把块写入
+     * [TextPage.advancedTitleBlock]，由 PageView 用叠加的 LottieAnimationView 渲染。
+     */
+    private suspend fun setTypeAdvancedTitle(book: Book, title: String): Boolean {
+        if (title.isBlank()) return false
+        if (pageAnim == PageAnim.scrollPageAnim) return false
+        currentCoroutineContext().ensureActive()
+        val lottieJson = AdvancedTitleConfig.renderValidLottieJson(book, title) ?: return false
+        val layout = resolveAdvancedTitleLayout(lottieJson) ?: return false
+        var startY = durY + titleTopSpacing
+        if (startY + layout.requiredHeight > visibleHeight) {
+            prepareNextPageIfNeed()
+            startY = titleTopSpacing.toFloat()
+        }
+        if (startY + layout.requiredHeight > visibleHeight) return false
+        pendingTextPage.advancedTitleBlock = TextPage.AdvancedTitleBlock(
+            offsetX = paddingLeft + (visibleWidth - layout.blockWidth) / 2f,
+            offsetY = paddingTop + startY,
+            width = layout.blockWidth,
+            height = layout.blockHeight,
+            json = lottieJson
+        )
+        durY = startY + layout.requiredHeight
+        if (pendingTextPage.height < durY) {
+            pendingTextPage.height = durY
+        }
+        return true
+    }
+
+    private fun resolveAdvancedTitleLayout(lottieJson: String): AdvancedTitleLayout? {
+        if (visibleWidth <= 0 || visibleHeight <= 0) return null
+        val titleTop = titleTopSpacing.toFloat()
+        val titleBottom = titleBottomSpacing.toFloat()
+        val maxBlockHeight = visibleHeight - titleTop - titleBottom
+        if (maxBlockHeight <= 0f) return null
+
+        val titleScale = advancedTitleScale()
+        val heightScale = AdvancedTitleConfig.heightFactor /
+            AdvancedTitleConfig.DEFAULT_HEIGHT_FACTOR.toFloat()
+        val aspectRatio = resolveAdvancedTitleAspectRatio(lottieJson)
+        val maxBlockWidth = visibleWidth.toFloat()
+        val requestedWidth =
+            (maxBlockWidth * ADVANCED_TITLE_WIDTH_FACTOR * titleScale * heightScale)
+                .coerceAtLeast(1f)
+        val requestedHeight = requestedWidth * aspectRatio
+        val widthLimited = requestedWidth > maxBlockWidth
+        val heightLimited = requestedHeight > maxBlockHeight
+        val blockWidth: Float
+        val blockHeight: Float
+        if (heightLimited && (!widthLimited || maxBlockHeight / aspectRatio <= maxBlockWidth)) {
+            blockHeight = maxBlockHeight
+            blockWidth = (blockHeight / aspectRatio).coerceIn(1f, maxBlockWidth)
+        } else {
+            blockWidth = requestedWidth.coerceIn(1f, maxBlockWidth)
+            blockHeight = (blockWidth * aspectRatio).coerceAtMost(maxBlockHeight)
+        }
+        val requiredHeight = blockHeight + titleBottom
+        return AdvancedTitleLayout(blockWidth, blockHeight, requiredHeight)
+    }
+
+    private fun advancedTitleScale(): Float {
+        val textSize = ReadBookConfig.textSize
+        return ((textSize + ReadBookConfig.titleSize * ADVANCED_TITLE_SIZE_FACTOR) /
+            textSize.coerceAtLeast(1))
+            .coerceIn(0.6f, 2.5f)
+    }
+
+    private fun resolveAdvancedTitleAspectRatio(lottieJson: String): Float {
+        return runCatching {
+            val root = JSONObject(lottieJson)
+            val width = root.optDouble("w", DEFAULT_LOTTIE_WIDTH.toDouble()).toFloat()
+            val height = root.optDouble("h", DEFAULT_LOTTIE_HEIGHT.toDouble()).toFloat()
+            if (width > 0f && height > 0f) {
+                height / width
+            } else {
+                DEFAULT_LOTTIE_HEIGHT / DEFAULT_LOTTIE_WIDTH
+            }
+        }.getOrDefault(DEFAULT_LOTTIE_HEIGHT / DEFAULT_LOTTIE_WIDTH)
+    }
+
+    private data class AdvancedTitleLayout(
+        val blockWidth: Float,
+        val blockHeight: Float,
+        val requiredHeight: Float
+    )
+
     private companion object {
+        /** 高级标题字号相对正文的放大系数（与 Archive 保持一致） */
+        const val ADVANCED_TITLE_SIZE_FACTOR = 1.25f
+        /** 高级标题块宽度占可视宽度的比例 */
+        const val ADVANCED_TITLE_WIDTH_FACTOR = 0.86f
+        const val DEFAULT_LOTTIE_WIDTH = 720f
+        const val DEFAULT_LOTTIE_HEIGHT = 112f
+
         /** 气泡 js 执行的最大并发数，防止瞬时请求压垮书源服务器（见 preprocessBubbleJs 注释） */
         private const val BUBBLE_JS_MAX_CONCURRENCY = 2
         val FORCED_BUBBLE_TEXT_REGEX = Regex(

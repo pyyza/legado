@@ -371,4 +371,16 @@ object PreferKey {
 
     /** 书架分组隐藏的标签，JSON Map<groupId, Set<tag>> */
     const val bookshelfHiddenTags = "bookshelfHiddenTags"
+
+    // ==================== 高级标题（Lottie 章节标题）====================
+    /** 全局分割规则，JSON AdvancedTitleConfig.SplitRule */
+    const val advancedTitleConfig = "advancedTitleConfig"
+    /** 兼容旧版的单条 Lottie JSON（同时作为当前激活项的恢复副本） */
+    const val advancedTitleLottieJson = "advancedTitleLottieJson"
+    /** 兼容旧版的单条 Lottie 文件路径 */
+    const val advancedTitleLottiePath = "advancedTitleLottiePath"
+    /** 当前激活的高级标题包 id */
+    const val advancedTitlePackage = "advancedTitlePackage"
+    /** 高级标题占位高度系数，30..120 */
+    const val advancedTitleHeightFactor = "advancedTitleHeightFactor"
 }

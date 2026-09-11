@@ -2556,4 +2556,38 @@
     <string name="storage_cache_item_count">%1$d 项缓存</string>
     <!-- 精准管理：文件管理 -->
     <string name="file_delete_confirm">确定要删除 \"%1$s\" 吗？</string>
+
+    <!-- 高级标题（Lottie 章节标题） -->
+    <string name="advanced_title_mode_label">高级</string>
+    <string name="advanced_title_manage">高级标题管理</string>
+    <string name="advanced_title_manage_summary">管理多个 Lottie 标题，可预览、应用、编辑、导入、导出或删除。</string>
+    <string name="advanced_title_builtin">内置高级标题</string>
+    <string name="advanced_title_migrated">已迁移高级标题</string>
+    <string name="advanced_title_unnamed">未命名高级标题</string>
+    <string name="advanced_title_apply">应用</string>
+    <string name="advanced_title_applied">已应用</string>
+    <string name="advanced_title_current">当前</string>
+    <string name="advanced_title_source_builtin">内置</string>
+    <string name="advanced_title_source_local">本地</string>
+    <string name="advanced_title_name">标题名称</string>
+    <string name="advanced_title_edit_title">编辑高级标题</string>
+    <string name="advanced_title_name_required">标题名称不能为空</string>
+    <string name="advanced_title_open_editor">编辑 JSON</string>
+    <string name="advanced_title_json_label">高级标题 JSON</string>
+    <string name="advanced_title_json_hint">在代码编辑器中修改当前条目的 Lottie JSON；导入新条目请返回管理页操作。</string>
+    <string name="advanced_title_rule_label">分隔规则</string>
+    <string name="advanced_title_use_regex">使用正则</string>
+    <string name="advanced_title_sample_default">第一章 接生</string>
+    <string name="advanced_title_preview_template">s1: %1$s\ns2: %2$s</string>
+    <string name="advanced_title_rule_error">规则错误：%1$s</string>
+    <string name="advanced_title_height_factor_label">高级标题占位高度系数</string>
+    <string name="advanced_title_height_factor_hint">30-120，默认 55（按可视高度百分比）</string>
+    <string name="advanced_title_import_title">导入高级标题</string>
+    <string name="advanced_title_import_from_net">网络导入</string>
+    <string name="advanced_title_import_net_failed">网络导入失败：%1$s</string>
+    <string name="advanced_title_exported">已导出</string>
+    <string name="advanced_title_invalid_json">Lottie JSON 无效</string>
+    <string name="advanced_title_input_url">输入地址</string>
+    <string name="advanced_title_too_large">Lottie JSON 超过 2 MB 限制</string>
+    <string name="advanced_title_package_limit">最多可保存 64 个高级标题</string>
 </resources>
