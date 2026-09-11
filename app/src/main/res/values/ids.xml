@@ -24,5 +24,6 @@
     <item name="explore_content_signature" type="id" />
     <item name="ui_title_typeface_role" type="id" />
     <item name="bubble_preview_key" type="id" />
+    <item name="advanced_title_preview_key" type="id" />
 
 </resources>
