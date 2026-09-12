@@ -37,6 +37,7 @@ import io.legado.app.lib.theme.applyUiLabelStyle
 import io.legado.app.lib.theme.applyUiSectionTitleStyle
 import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.ui.book.read.config.AdvancedTitleConfigDialog
+import io.legado.app.ui.book.read.page.AdvancedTitleCompositionCache
 import io.legado.app.ui.book.read.page.LottieImageBitmapCache
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.applyNavigationBarMargin
@@ -358,6 +359,7 @@ class AdvancedTitleManageActivity : BaseActivity<ActivityThemeManageBinding>(),
 
     private fun notifyReader() {
         LottieImageBitmapCache.clear()
+        AdvancedTitleCompositionCache.clear()
         postEvent(EventBus.UP_CONFIG, arrayListOf(5, 8))
     }
 

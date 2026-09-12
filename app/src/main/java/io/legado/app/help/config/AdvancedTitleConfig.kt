@@ -1,5 +1,6 @@
 package io.legado.app.help.config
 
+import android.os.Build
 import io.legado.app.R
 import com.airbnb.lottie.LottieCompositionFactory
 import io.legado.app.constant.PreferKey
@@ -170,9 +171,18 @@ object AdvancedTitleConfig {
         val match = runCatching { Regex(pattern).find(title) }.getOrNull()
         if (match != null) {
             val groups = match.groups
-            val namedGroups = groups as? MatchNamedGroupCollection
-            val namedS1 = runCatching { namedGroups?.get("s1")?.value }.getOrNull()
-            val namedS2 = runCatching { namedGroups?.get("s2")?.value }.getOrNull()
+            // 命名组（(?<s1>…)/(?<s2>…)）底层走 Matcher#start(String)，API 26 起才可用；
+            // 低版本直接回退到按序号取组，行为等价（无非是少了命名组的写法支持）。
+            val namedS1: String?
+            val namedS2: String?
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val namedGroups = groups as? MatchNamedGroupCollection
+                namedS1 = runCatching { namedGroups?.get("s1")?.value }.getOrNull()
+                namedS2 = runCatching { namedGroups?.get("s2")?.value }.getOrNull()
+            } else {
+                namedS1 = null
+                namedS2 = null
+            }
             val s1 = (namedS1 ?: groups.getOrNull(1)?.value).orEmpty().trim()
             val s2 = (namedS2 ?: groups.getOrNull(2)?.value).orEmpty().trim()
             if (s1.isNotBlank() && s2.isNotBlank()) return Parts(title, s1, s2)
