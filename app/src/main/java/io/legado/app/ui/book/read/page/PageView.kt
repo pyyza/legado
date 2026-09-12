@@ -20,7 +20,6 @@ import androidx.core.view.isGone
 import androidx.core.view.isInvisible
 import com.airbnb.lottie.ImageAssetDelegate
 import com.airbnb.lottie.LottieAnimationView
-import com.airbnb.lottie.model.LottieCompositionCache
 import com.airbnb.lottie.LottieDrawable
 import com.airbnb.lottie.LottieImageAsset
 import com.airbnb.lottie.LottieOnCompositionLoadedListener
@@ -743,15 +742,18 @@ class PageView(context: Context) : FrameLayout(context) {
                 if (lottieView.tag == nextKey) showFallback(block)
             }
             if (resolvedJson != null) {
-                LottieCompositionCache.getInstance().get(nextKey)?.let { composition ->
+                AdvancedTitleCompositionCache.get(nextKey)?.let { composition ->
                     lottieView.setComposition(composition)
                     showComposition()
                     return nextKey
                 }
             }
             lottieView.addLottieOnCompositionLoadedListener(
-                LottieOnCompositionLoadedListener {
-                    if (lottieView.tag == nextKey) showComposition()
+                LottieOnCompositionLoadedListener { composition ->
+                    if (lottieView.tag == nextKey) {
+                        composition?.let { AdvancedTitleCompositionCache.put(nextKey, it) }
+                        showComposition()
+                    }
                 }
             )
             runCatching {
