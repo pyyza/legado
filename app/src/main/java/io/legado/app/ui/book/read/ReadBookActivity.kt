@@ -925,6 +925,9 @@ class ReadBookActivity : BaseReadBookActivity(),
         val navigationBarHeight =
             if (!ReadBookConfig.hideNavigationBar && navigationBarGravity == Gravity.BOTTOM)
                 binding.navigationBar.height else 0
+        // 起始光标把手高度：菜单向下展开时需让开它，否则菜单顶边会压住选择光标
+        val cursorHandleHeight = binding.cursorLeft.height.takeIf { it > 0 }
+            ?: (24 * resources.displayMetrics.density).toInt()
         textActionMenu.show(
             binding.textMenuPosition,
             binding.root.height + navigationBarHeight,
@@ -932,7 +935,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             binding.textMenuPosition.y.toInt(),
             binding.cursorLeft.y.toInt(),
             binding.cursorRight.x.toInt(),
-            binding.cursorRight.y.toInt() + binding.cursorRight.height
+            binding.cursorRight.y.toInt() + binding.cursorRight.height,
+            cursorHandleHeight
         )
     }
 
