@@ -995,6 +995,9 @@ class ReadBookActivity : BaseReadBookActivity(),
         val menuTop = binding.cursorLeft.y.toInt().coerceIn(0, binding.root.height)
         val menuBottom = (binding.cursorRight.y.toInt() + binding.cursorRight.height)
             .coerceIn(0, binding.root.height)
+        // 起始光标把手高度：菜单向下展开时需让开它，否则菜单顶边会压住选择光标
+        val cursorHandleHeight = binding.cursorLeft.height.takeIf { it > 0 }
+            ?: (24 * resources.displayMetrics.density).toInt()
         textActionMenu.show(
             binding.textMenuPosition,
             binding.root.height + navigationBarHeight,
@@ -1002,7 +1005,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             binding.textMenuPosition.y.toInt(),
             menuTop,
             binding.cursorRight.x.toInt(),
-            menuBottom
+            menuBottom,
+            cursorHandleHeight
         )
     }
 
