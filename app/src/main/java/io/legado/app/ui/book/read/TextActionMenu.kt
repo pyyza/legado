@@ -212,11 +212,14 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
      * @param startTopY 选择起始点顶部Y坐标
      * @param startBottomY 选择起始点底部Y坐标
      * @param endX 选择结束点X坐标
-     * @param endBottomY 选择结束点底部Y坐标
+     * @param endBottomY 选择结束点底部Y坐标（已含结束光标把手高度）
+     * @param handleHeight 起始位置选择光标把手的高度（px），菜单向下展开时需让开该高度，
+     *                     否则菜单顶边会压住光标把手；传 0 表示不需要让位
      * 
      * 显示策略（不依赖 contentView.measure，避免 RecyclerView+FlexboxLayout 测量不准）：
      * - 上方空间充裕（>300px）→ Gravity.BOTTOM，菜单向上生长，绝不遮挡选中文字
-     * - 接近页眉 → Gravity.TOP at startBottomY，菜单紧贴选中文字起始位置下方
+     * - 接近页眉 → Gravity.TOP，菜单顶边落在「起始把手底边」与「结束把手底边」的较大者之下，
+     *   保证既压不到起始光标，也压不到结束光标与选中文字（多行向下选区时两者会差很多）
      */
     fun show(
         view: View,
@@ -225,7 +228,8 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
         startTopY: Int,
         startBottomY: Int,
         endX: Int,
-        endBottomY: Int
+        endBottomY: Int,
+        handleHeight: Int = 0
     ) {
         upMenu()
         if (startTopY > 300) {
@@ -237,12 +241,13 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
                 windowHeight - startTopY
             )
         } else {
-            // 接近页眉：菜单紧贴选中文字起始位置下方，向下生长
+            // 接近页眉：只能向下生长。顶边需同时让开起始与结束把手，
+            // 否则会遮住选择光标；多行选区时以更靠下的结束把手为准
             showAtLocation(
                 view,
                 Gravity.TOP or Gravity.START,
                 startX,
-                startBottomY
+                maxOf(startBottomY + handleHeight, endBottomY)
             )
         }
     }
