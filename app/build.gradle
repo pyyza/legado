@@ -138,7 +138,7 @@ android {
         }
     }
     // ABI 分拆仅用于 Release 发布产物；Debug 本地构建保持单一 universal 包，
-    // 避免按 armeabi-v7a/arm64-v8a/universal 重复打包拖慢日常构建。
+    // 避免按 ABI 重复打包拖慢日常构建。
     // 配置缓存已关闭（gradle.properties: unsafe.configuration-cache=false），读取任务名安全。
     def enableAbiSplits = gradle.startParameter.taskNames.any {
         it.toLowerCase().contains('release')
@@ -148,8 +148,10 @@ android {
         abi {
             enable enableAbiSplits
             reset()
-            include 'armeabi-v7a', 'arm64-v8a'
-            universalApk true
+            // 2026-09-13 起 release 只出 arm64-v8a 单包：不再产 armeabi-v7a，也不再产 universal。
+            // 如需恢复全版本，把 include 改回 'armeabi-v7a', 'arm64-v8a' 并把 universalApk 置 true。
+            include 'arm64-v8a'
+            universalApk false
         }
     }
     android.applicationVariants.configureEach { variant ->
