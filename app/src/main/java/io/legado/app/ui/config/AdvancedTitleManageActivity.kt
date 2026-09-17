@@ -266,7 +266,8 @@ class AdvancedTitleManageActivity : BaseActivity<ActivityThemeManageBinding>(),
                     json = json,
                     splitRule = entry.config.splitRuleOrNull() ?: AdvancedTitleConfig.globalRule,
                     heightFactor = entry.config.normalizedHeightFactorOrNull()
-                        ?: AdvancedTitleConfig.heightFactor
+                        ?: AdvancedTitleConfig.heightFactor,
+                    animationMode = entry.config.resolvedAnimationMode()
                 ).show(supportFragmentManager, TAG_EDIT)
             }.onFailure { toastOnUi(it.localizedMessage ?: getString(R.string.error)) }
         }
@@ -277,7 +278,8 @@ class AdvancedTitleManageActivity : BaseActivity<ActivityThemeManageBinding>(),
         name: String,
         json: String,
         splitRule: AdvancedTitleConfig.SplitRule,
-        heightFactor: Int
+        heightFactor: Int,
+        animationMode: Int
     ) {
         val entry = adapter.items.firstOrNull { it.id == entryId }
         if (entry == null || entry.isBuiltin) {
@@ -293,7 +295,8 @@ class AdvancedTitleManageActivity : BaseActivity<ActivityThemeManageBinding>(),
                         json = json,
                         oldEntry = entry,
                         splitRule = splitRule,
-                        heightFactor = heightFactor
+                        heightFactor = heightFactor,
+                        animationMode = animationMode
                     )
                     val active = AdvancedTitlePackageManager.activeId() == updated.id
                     if (active) AdvancedTitlePackageManager.apply(updated)
@@ -368,6 +371,13 @@ class AdvancedTitleManageActivity : BaseActivity<ActivityThemeManageBinding>(),
 
     private fun themeSecondaryTextColor(): Int =
         ContextCompat.getColor(this, R.color.secondaryText)
+
+    /** 列表里展示的动画模式短标签。 */
+    private fun animationModeLabelRes(mode: Int): Int = when (mode) {
+        AdvancedTitleConfig.ANIMATION_MODE_PLAY -> R.string.advanced_title_animation_play_short
+        AdvancedTitleConfig.ANIMATION_MODE_STATIC -> R.string.advanced_title_animation_static_short
+        else -> R.string.advanced_title_animation_auto_short
+    }
 
     private enum class Action(val titleRes: Int) {
         APPLY(R.string.advanced_title_apply),
@@ -515,6 +525,8 @@ class AdvancedTitleManageActivity : BaseActivity<ActivityThemeManageBinding>(),
                         if (entry.updatedAt > 0L) dateFormat.format(Date(entry.updatedAt))
                         else getString(R.string.advanced_title_source_builtin)
                     )
+                    append(" · ")
+                    append(getString(animationModeLabelRes(entry.config.resolvedAnimationMode())))
                 }
                 info.setTextColor(themeSecondaryTextColor())
 
