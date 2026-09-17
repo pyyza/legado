@@ -2628,6 +2628,14 @@
     <string name="advanced_title_rule_error">规则错误：%1$s</string>
     <string name="advanced_title_height_factor_label">高级标题占位高度系数</string>
     <string name="advanced_title_height_factor_hint">30-120，默认 55（按可视高度百分比）</string>
+    <string name="advanced_title_animation_label">标题动画</string>
+    <string name="advanced_title_animation_auto">自动检测</string>
+    <string name="advanced_title_animation_play">始终播放</string>
+    <string name="advanced_title_animation_static">静止不动</string>
+    <string name="advanced_title_animation_hint">自动检测会让静态模板只渲染一帧以省电；若检测有误，可手动改为始终播放或静止不动。</string>
+    <string name="advanced_title_animation_auto_short">自动</string>
+    <string name="advanced_title_animation_play_short">动画</string>
+    <string name="advanced_title_animation_static_short">静止</string>
     <string name="advanced_title_import_title">导入高级标题</string>
     <string name="advanced_title_import_from_net">网络导入</string>
     <string name="advanced_title_import_net_failed">网络导入失败：%1$s</string>
