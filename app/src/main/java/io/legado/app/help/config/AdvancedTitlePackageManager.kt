@@ -38,7 +38,9 @@ object AdvancedTitlePackageManager {
         val splitMode: Int? = null,
         val delimiter: String? = null,
         val regex: String? = null,
-        val heightFactor: Int? = null
+        val heightFactor: Int? = null,
+        /** 动画模式，见 [AdvancedTitleConfig.ANIMATION_MODE_AUTO] 等取值。 */
+        val animationMode: Int? = null
     ) {
         fun splitRuleOrNull(): AdvancedTitleConfig.SplitRule? {
             if (splitMode == null && delimiter == null && regex == null) return null
@@ -54,6 +56,10 @@ object AdvancedTitlePackageManager {
         }
 
         fun normalizedHeightFactorOrNull(): Int? = heightFactor?.coerceIn(30, 120)
+
+        /** 动画模式，缺省或越界一律按自动检测处理。 */
+        fun resolvedAnimationMode(): Int =
+            AdvancedTitleConfig.normalizeAnimationMode(animationMode)
     }
 
     data class Entry(
@@ -87,7 +93,8 @@ object AdvancedTitlePackageManager {
             splitMode = AdvancedTitleConfig.SPLIT_DELIMITER,
             delimiter = " ",
             regex = AdvancedTitleConfig.DEFAULT_REGEX,
-            heightFactor = AdvancedTitleConfig.DEFAULT_HEIGHT_FACTOR
+            heightFactor = AdvancedTitleConfig.DEFAULT_HEIGHT_FACTOR,
+            animationMode = AdvancedTitleConfig.ANIMATION_MODE_AUTO
         ),
         isBuiltin = true
     )
@@ -161,7 +168,9 @@ object AdvancedTitlePackageManager {
         splitRule: AdvancedTitleConfig.SplitRule? = oldEntry?.config?.splitRuleOrNull()
             ?: AdvancedTitleConfig.globalRule,
         heightFactor: Int? = oldEntry?.config?.normalizedHeightFactorOrNull()
-            ?: AdvancedTitleConfig.heightFactor
+            ?: AdvancedTitleConfig.heightFactor,
+        animationMode: Int? = oldEntry?.config?.animationMode
+            ?: AdvancedTitleConfig.ANIMATION_MODE_AUTO
     ): Entry =
         synchronized(mutationLock) {
         val normalizedName = normalizeName(name)
@@ -189,7 +198,8 @@ object AdvancedTitlePackageManager {
             splitMode = splitRule?.mode,
             delimiter = splitRule?.delimiter,
             regex = splitRule?.regex,
-            heightFactor = heightFactor?.coerceIn(30, 120)
+            heightFactor = heightFactor?.coerceIn(30, 120),
+            animationMode = animationMode?.let { AdvancedTitleConfig.normalizeAnimationMode(it) }
         )
         try {
             staging.mkdirs()
@@ -225,6 +235,8 @@ object AdvancedTitlePackageManager {
         AdvancedTitleConfig.lottiePath = null
         entry.config.splitRuleOrNull()?.let { AdvancedTitleConfig.globalRule = it }
         entry.config.normalizedHeightFactorOrNull()?.let { AdvancedTitleConfig.heightFactor = it }
+        // 动画模式必须无条件回写：AUTO 也要覆盖，否则会残留上一条模板的模式。
+        AdvancedTitleConfig.animationMode = entry.config.resolvedAnimationMode()
         invalidate()
     }
 
@@ -246,6 +258,7 @@ object AdvancedTitlePackageManager {
                 builtin.normalizedHeightFactorOrNull()?.let {
                     AdvancedTitleConfig.heightFactor = it
                 }
+                AdvancedTitleConfig.animationMode = builtin.resolvedAnimationMode()
             }
             invalidate()
         }

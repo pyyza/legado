@@ -71,6 +71,14 @@ class PageView(context: Context) : FrameLayout(context) {
     var isScroll = false
     private var currentTextPage: TextPage? = null
     private var advancedTitleLottieKey: String? = null
+
+    /**
+     * 当前页的高级标题是否为真动画。
+     *
+     * 静态模板（所有属性都是固定值、文字只有单个文档关键帧）每一帧画面完全相同，
+     * 无限循环播放只会白白持续重绘，因此这种情况不启动动画，只渲染一帧。
+     */
+    private var advancedTitleAnimated = true
     private val styledLottieJsonCache = object : LinkedHashMap<String, String>(8, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean {
             return size > MAX_STYLED_LOTTIE_CACHE_SIZE
@@ -416,7 +424,7 @@ class PageView(context: Context) : FrameLayout(context) {
         binding.contentTextView.setIsScroll(value)
         if (value) {
             binding.advancedTitleLottie.pauseAnimation()
-        } else if (binding.advancedTitleLottie.visibility == VISIBLE) {
+        } else if (binding.advancedTitleLottie.visibility == VISIBLE && advancedTitleAnimated) {
             binding.advancedTitleLottie.playAnimation()
         }
     }
@@ -608,6 +616,7 @@ class PageView(context: Context) : FrameLayout(context) {
             lottieView.cancelAnimation()
             lottieView.visibility = GONE
             fallbackView.visibility = GONE
+            advancedTitleAnimated = true
             return null
         }
 
@@ -679,10 +688,14 @@ class PageView(context: Context) : FrameLayout(context) {
         lottieView.scaleType = ImageView.ScaleType.FIT_CENTER
         lottieView.translationX = resolveTitleTranslationX(block, targetWidth)
         lottieView.translationY = resolveTitleTranslationY(block, targetHeight)
-        lottieView.repeatCount = LottieDrawable.INFINITE
         lottieView.setFontAssetDelegate(defaultFontAssetDelegate)
         val json = block.json.takeIf { it.isNotBlank() }
         val resolvedJson = json?.let { applyLottieTextFallbackStyle(it, advancedTitleTextLayerScale(block, pageWidth)) }
+        // 由用户设置决定：自动检测（静态模板只渲染一帧，省电）/ 强制播放 / 强制静止。
+        // 解析失败按动画处理，行为与改动前一致。
+        val animated = resolvedJson?.let { AdvancedTitleConfig.resolveAnimated(it) } ?: true
+        advancedTitleAnimated = animated
+        lottieView.repeatCount = if (animated) LottieDrawable.INFINITE else 0
         val compositionSize = resolvedJson?.let(::lottieCompositionSize)
         lottieView.setMaintainOriginalImageBounds(true)
         lottieView.setImageAssetDelegate(
@@ -704,7 +717,7 @@ class PageView(context: Context) : FrameLayout(context) {
             lottieView.progress = 0f
             lottieView.alpha = 1f
             lottieView.visibility = VISIBLE
-            if (isMainView && !isScroll) {
+            if (isMainView && !isScroll && animated) {
                 lottieView.playAnimation()
             } else {
                 lottieView.pauseAnimation()
@@ -758,9 +771,9 @@ class PageView(context: Context) : FrameLayout(context) {
         lottieView.alpha = 1f
         lottieView.visibility = VISIBLE
         runCatching {
-            if (isMainView && !isScroll && !lottieView.isAnimating) {
+            if (isMainView && !isScroll && animated && !lottieView.isAnimating) {
                 lottieView.playAnimation()
-            } else if (!isMainView || isScroll) {
+            } else if (!isMainView || isScroll || !animated) {
                 lottieView.pauseAnimation()
                 lottieView.progress = 0f
             }

@@ -2701,6 +2701,14 @@ Night: %5$s / %6$s / %7$s / %8$s</string>
     <string name="advanced_title_rule_error">Rule error: %1$s</string>
     <string name="advanced_title_height_factor_label">Render height ratio</string>
     <string name="advanced_title_height_factor_hint">30-120, default 55 (percent of visible height)</string>
+    <string name="advanced_title_animation_label">Animation</string>
+    <string name="advanced_title_animation_auto">Auto</string>
+    <string name="advanced_title_animation_play">Always play</string>
+    <string name="advanced_title_animation_static">Static</string>
+    <string name="advanced_title_animation_hint">Auto keeps static templates from looping to save power. Pick Always play or Static to override when detection is wrong.</string>
+    <string name="advanced_title_animation_auto_short">Auto</string>
+    <string name="advanced_title_animation_play_short">Animated</string>
+    <string name="advanced_title_animation_static_short">Static</string>
     <string name="advanced_title_import_title">Import advanced title</string>
     <string name="advanced_title_import_from_net">Import from URL</string>
     <string name="advanced_title_import_net_failed">Network import failed: %1$s</string>

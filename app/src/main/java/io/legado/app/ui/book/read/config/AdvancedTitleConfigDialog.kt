@@ -18,12 +18,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.DialogFragment
 import io.legado.app.R
 import io.legado.app.help.config.AdvancedTitleConfig
 import io.legado.app.help.config.AdvancedTitlePackageManager
 import io.legado.app.lib.theme.UiCorner
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.applyUiBodyTypefaceDeep
 import io.legado.app.lib.theme.applyUiInputStyle
 import io.legado.app.lib.theme.applyUiLabelStyle
@@ -49,13 +51,15 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         private const val ARG_DELIMITER = "delimiter"
         private const val ARG_REGEX = "regex"
         private const val ARG_HEIGHT_FACTOR = "heightFactor"
+        private const val ARG_ANIMATION_MODE = "animationMode"
 
         fun edit(
             entryId: String,
             name: String,
             json: String,
             splitRule: AdvancedTitleConfig.SplitRule,
-            heightFactor: Int
+            heightFactor: Int,
+            animationMode: Int
         ) = AdvancedTitleConfigDialog().apply {
             currentJson = json
             arguments = Bundle().apply {
@@ -65,6 +69,10 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                 putString(ARG_DELIMITER, splitRule.delimiter)
                 putString(ARG_REGEX, splitRule.regex)
                 putInt(ARG_HEIGHT_FACTOR, heightFactor.coerceIn(30, 120))
+                putInt(
+                    ARG_ANIMATION_MODE,
+                    AdvancedTitleConfig.normalizeAnimationMode(animationMode)
+                )
             }
         }
     }
@@ -78,7 +86,8 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             name: String,
             json: String,
             splitRule: AdvancedTitleConfig.SplitRule,
-            heightFactor: Int
+            heightFactor: Int,
+            animationMode: Int
         )
     }
 
@@ -116,6 +125,9 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         val initialHeightFactor = args.getInt(
             ARG_HEIGHT_FACTOR,
             AdvancedTitleConfig.DEFAULT_HEIGHT_FACTOR
+        )
+        var selectedAnimationMode = AdvancedTitleConfig.normalizeAnimationMode(
+            args.getInt(ARG_ANIMATION_MODE, AdvancedTitleConfig.ANIMATION_MODE_AUTO)
         )
         if (currentJson.isBlank()) {
             currentJson = runCatching {
@@ -184,6 +196,58 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             setOnClickListener { openJsonEditor() }
         }
 
+        // 动画三态：分段按钮，选中项用强调色高亮。
+        // 静态模板被判定为「无关键帧」时默认只渲染一帧，这里允许人工改成始终播放。
+        val animationOptions = listOf(
+            R.string.advanced_title_animation_auto to AdvancedTitleConfig.ANIMATION_MODE_AUTO,
+            R.string.advanced_title_animation_play to AdvancedTitleConfig.ANIMATION_MODE_PLAY,
+            R.string.advanced_title_animation_static to AdvancedTitleConfig.ANIMATION_MODE_STATIC
+        )
+        val animationButtons = LinkedHashMap<Int, TextView>()
+        val accentTint = ColorUtils.setAlphaComponent(context.accentColor, (0.22f * 255).toInt())
+        fun refreshAnimationButtons() {
+            animationButtons.forEach { (mode, view) ->
+                val chosen = mode == selectedAnimationMode
+                view.isSelected = chosen
+                view.setTextColor(
+                    if (chosen) context.accentColor
+                    else ContextCompat.getColor(context, R.color.primaryText)
+                )
+            }
+        }
+        val animationRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        animationOptions.forEachIndexed { index, (labelRes, mode) ->
+            val option = button(getString(labelRes)).apply {
+                background = UiCorner.actionSelector(
+                    ContextCompat.getColor(context, R.color.background_card_surface),
+                    accentTint,
+                    UiCorner.actionRadius(context)
+                )
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    1f
+                ).apply { if (index < animationOptions.lastIndex) marginEnd = 6.dpToPx() }
+                setOnClickListener {
+                    selectedAnimationMode = mode
+                    refreshAnimationButtons()
+                }
+            }
+            animationButtons[mode] = option
+            animationRow.addView(option)
+        }
+        refreshAnimationButtons()
+        val animationHint = TextView(context).apply {
+            text = getString(R.string.advanced_title_animation_hint)
+            textSize = 12f
+            typeface = context.uiTypeface()
+            setPadding(0, 4.dpToPx(), 0, 0)
+            setTextColor(ContextCompat.getColor(context, android.R.color.darker_gray))
+        }
+
         fun buildRule() = AdvancedTitleConfig.SplitRule(
             mode = if (regexCheck.isChecked) {
                 AdvancedTitleConfig.SPLIT_REGEX
@@ -237,6 +301,9 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         root.addView(preview)
         root.addView(label(getString(R.string.advanced_title_height_factor_label)))
         root.addView(heightEdit)
+        root.addView(label(getString(R.string.advanced_title_animation_label)))
+        root.addView(animationRow)
+        root.addView(animationHint)
         root.addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -303,7 +370,8 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                         name,
                         json,
                         rule,
-                        heightFactor
+                        heightFactor,
+                        selectedAnimationMode
                     )
                 }
             })

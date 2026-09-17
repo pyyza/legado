@@ -1,6 +1,7 @@
 package io.legado.app.help.config
 
 import android.os.Build
+import android.util.LruCache
 import io.legado.app.R
 import com.airbnb.lottie.LottieCompositionFactory
 import io.legado.app.constant.PreferKey
@@ -11,9 +12,11 @@ import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.putPrefString
+import org.json.JSONArray
 import org.json.JSONObject
 import splitties.init.appCtx
 import java.io.File
+import kotlin.math.abs
 
 /**
  * 高级标题（Lottie 章节标题）配置。
@@ -29,7 +32,22 @@ object AdvancedTitleConfig {
     const val SPLIT_REGEX = 1
     const val LOTTIE_BLOCK_ROLE = "advanced_title_lottie"
     const val DEFAULT_HEIGHT_FACTOR = 55
+
+    /** 动画模式：跟随模板 [isAnimatedLottieJson] 自动检测（默认）。 */
+    const val ANIMATION_MODE_AUTO = 0
+
+    /** 动画模式：强制逐帧播放，即使模板本身是静态的。 */
+    const val ANIMATION_MODE_PLAY = 1
+
+    /** 动画模式：强制静止，只渲染第一帧。 */
+    const val ANIMATION_MODE_STATIC = 2
+
+    /** 合法区间，用于把外部传入的模式值收敛到三态之内。 */
+    val ANIMATION_MODE_RANGE = ANIMATION_MODE_AUTO..ANIMATION_MODE_STATIC
     private const val BOOK_RULE_KEY = "advancedTitleRule"
+
+    /** [isAnimatedLottieJson] 的结果缓存，键为「长度:hashCode」。 */
+    private val animationFlagCache = LruCache<String, Boolean>(32)
 
     data class SplitRule(
         val mode: Int = SPLIT_DELIMITER,
@@ -69,6 +87,40 @@ object AdvancedTitleConfig {
         set(value) {
             appCtx.putPrefInt(PreferKey.advancedTitleHeightFactor, value.coerceIn(30, 120))
         }
+
+    /**
+     * 当前生效条目的动画模式，取值 [ANIMATION_MODE_AUTO] / [ANIMATION_MODE_PLAY] / [ANIMATION_MODE_STATIC]。
+     *
+     * 翻页渲染时只会用到「当前应用」的那一条模板，所以这里只保存单值，由
+     * [AdvancedTitlePackageManager.apply] 在切换条目时回写——与 globalRule / heightFactor
+     * 的处理方式一致，避免在渲染路径上反复读 package.json。
+     */
+    var animationMode: Int
+        get() = normalizeAnimationMode(
+            appCtx.getPrefInt(PreferKey.advancedTitleAnimationMode, ANIMATION_MODE_AUTO)
+        )
+        set(value) {
+            appCtx.putPrefInt(PreferKey.advancedTitleAnimationMode, normalizeAnimationMode(value))
+        }
+
+    /** 把任意来源的模式值收敛到合法区间，`null` 视为 [ANIMATION_MODE_AUTO]。 */
+    fun normalizeAnimationMode(value: Int?): Int {
+        return (value ?: ANIMATION_MODE_AUTO).coerceIn(ANIMATION_MODE_RANGE)
+    }
+
+    /**
+     * 结合用户设置与模板内容，决定这份 JSON 是否需要逐帧播放。
+     *
+     * [ANIMATION_MODE_AUTO] 用 [isAnimatedLottieJson] 自动检测；
+     * 另两个取值直接覆盖检测结果，用于自动检测误判时人工纠正。
+     */
+    fun resolveAnimated(json: String): Boolean {
+        return when (animationMode) {
+            ANIMATION_MODE_PLAY -> true
+            ANIMATION_MODE_STATIC -> false
+            else -> isAnimatedLottieJson(json)
+        }
+    }
 
     fun bookRule(book: Book?): SplitRule? {
         val value = book?.getVariable(BOOK_RULE_KEY)?.takeIf { it.isNotBlank() } ?: return null
@@ -131,6 +183,89 @@ object AdvancedTitleConfig {
             val obj = JSONObject(json)
             obj.optJSONArray("layers")?.length()?.let { it > 0 } == true
         }.getOrDefault(false)
+    }
+
+    /**
+     * 判断模板里是否含有真正的动画。
+     *
+     * 阅读器对高级标题默认用无限循环播放，但标题编辑器导出的模板允许是纯静态的
+     * （所有属性都是固定值、文字只有单个文档关键帧）。静态模板每一帧画面完全相同，
+     * 继续循环播放就是纯粹的持续重绘开销。
+     *
+     * 这是 [ANIMATION_MODE_AUTO] 下的判定依据，外部应通过 [resolveAnimated] 取值，
+     * 以便用户用 [ANIMATION_MODE_PLAY] / [ANIMATION_MODE_STATIC] 覆盖检测结果。
+     *
+     * 解析失败一律返回 true（按动画处理），保证回退到原有行为。
+     */
+    fun isAnimatedLottieJson(json: String): Boolean {
+        val key = "${json.length}:${json.hashCode()}"
+        animationFlagCache.get(key)?.let { return it }
+        val animated = runCatching { detectAnimated(JSONObject(json)) }.getOrDefault(true)
+        animationFlagCache.put(key, animated)
+        return animated
+    }
+
+    private fun detectAnimated(root: JSONObject): Boolean {
+        if (hasAnimatedFlag(root)) return true
+        // 拿不到图层列表时不下结论，交给调用方按动画处理
+        val layers = root.optJSONArray("layers") ?: return true
+        val compIn = root.optDouble("ip", 0.0)
+        val compOut = root.optDouble("op", 0.0)
+        for (i in 0 until layers.length()) {
+            val layer = layers.optJSONObject(i) ?: continue
+            // 进出场时间与合成不一致 → 图层会中途出现或消失，属于动画
+            if (abs(layer.optDouble("ip", compIn) - compIn) > 0.01) return true
+            if (abs(layer.optDouble("op", compOut) - compOut) > 0.01) return true
+            if (textIsAnimated(layer)) return true
+        }
+        return false
+    }
+
+    /**
+     * Lottie 用 `"a": 1` 标记「该属性走关键帧」，所以整棵树递归扫一遍即可。
+     *
+     * 注意 `"a"` 同时也是变换里的「锚点」属性名（其值是对象而不是数字），
+     * 因此只认值为数字 1 或布尔 true 的那种，避免把锚点误判成动画。
+     */
+    private fun hasAnimatedFlag(value: Any?): Boolean {
+        return when (value) {
+            is JSONObject -> {
+                val names = value.keys()
+                var found = false
+                while (names.hasNext() && !found) {
+                    val name = names.next()
+                    val child = value.opt(name)
+                    if (name == "a") {
+                        if (child is Number && child.toInt() == 1) found = true
+                        if (child is Boolean && child) found = true
+                    }
+                    if (!found) found = hasAnimatedFlag(child)
+                }
+                found
+            }
+            is JSONArray -> {
+                var found = false
+                var i = 0
+                while (i < value.length() && !found) {
+                    found = hasAnimatedFlag(value.opt(i))
+                    i++
+                }
+                found
+            }
+            else -> false
+        }
+    }
+
+    /**
+     * 文字动画不走 `"a": 1` 这条线索：文字用文档关键帧数组（`t.d.k`）表达，
+     * 文字动画器放在 `t.a` 数组里，这两处需要单独判断。
+     */
+    private fun textIsAnimated(layer: JSONObject): Boolean {
+        val text = layer.optJSONObject("t") ?: return false
+        val animators = text.optJSONArray("a")
+        if (animators != null && animators.length() > 0) return true
+        val keyFrames = text.optJSONObject("d")?.opt("k")
+        return keyFrames is JSONArray && keyFrames.length() > 1
     }
 
     fun preview(title: String, book: Book? = null): String {
