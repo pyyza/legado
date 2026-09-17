@@ -390,4 +390,6 @@ object PreferKey {
     const val advancedTitlePackage = "advancedTitlePackage"
     /** 高级标题占位高度系数，30..120 */
     const val advancedTitleHeightFactor = "advancedTitleHeightFactor"
+    /** 当前生效条目的动画模式，0 自动检测 / 1 强制播放 / 2 强制静止 */
+    const val advancedTitleAnimationMode = "advancedTitleAnimationMode"
 }
