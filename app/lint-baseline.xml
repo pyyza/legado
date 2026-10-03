@@ -18073,4 +18073,26 @@
             column="9"/>
     </issue>
 
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+        errorLine1="                text = context.getString(R.string.author_show, book.author),"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/legado/app/ui/book/explore/compose/ExploreShowItems.kt"
+            line="210"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+        errorLine1="                    text = context.getString(R.string.lasted_show, book.latestChapterTitle),"
+        errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/legado/app/ui/book/explore/compose/ExploreShowItems.kt"
+            line="219"
+            column="28"/>
+    </issue>
+
 </issues>
