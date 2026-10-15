@@ -160,7 +160,9 @@ object BookCover {
      */
     fun persistCover(identity: String?, coverUrl: String?) {
         if (identity.isNullOrBlank() || coverUrl.isNullOrBlank()) return
-        if (!identity.startsWith("http") || !coverUrl.startsWith("http")) return
+        // 身份不限 http（本地书 bookUrl 是文件路径，同样需要持久化），封面必须是 http 网络图
+        if (!coverUrl.startsWith("http")) return
+        // "|" 是搜索/聚合结果的组合身份，非单本书籍，不参与持久化
         if (identity.contains("|")) return
         lastPersistTime[identity]?.let {
             if (System.currentTimeMillis() - it < persistIntervalMillis) return
