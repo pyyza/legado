@@ -33,8 +33,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.target.Target
 import com.bumptech.glide.request.transition.Transition
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.glide.HtmlCoverRenderer
@@ -111,7 +115,9 @@ fun AppBookCover(
     val galleryCover = remember(galleryIdentity, coverPath) {
         BookCover.getGalleryDefaultCover(galleryIdentity, coverPath)
     }
-    val realPath = galleryCover ?: coverPath?.takeIf { it.isNotBlank() }
+    // 本地持久化封面优先：封面 URL 带时效签名轮换后，离线仍可从本地文件加载
+    val realPath = galleryCover
+        ?: BookCover.getStableCover(galleryIdentity, coverPath)?.takeIf { it.isNotBlank() }
     // 图集默认封面优先于"强制默认封面"：命中图集时仍显示图集封面
     val useDefaultCover = AppConfig.useDefaultCover && galleryCover == null
     // HTML 模板封面在 View 版里优先于"使用默认封面"，两者顺序不能调换
@@ -142,6 +148,7 @@ fun AppBookCover(
                 sourceOrigin = sourceOrigin,
                 loadOnlyWifi = loadOnlyWifi,
                 requestSize = bounds,
+                persistIdentity = galleryIdentity,
             ) ?: fallbackPath?.let {
                 // 取图优先级是"图集 → 真实图片 → HTML → 默认封面"，图集那张取不到时必须继续往下走，
                 // 否则图集文件缺失/损坏会表现为"整屏封面都退化成默认封面"
@@ -151,6 +158,7 @@ fun AppBookCover(
                     sourceOrigin = sourceOrigin,
                     loadOnlyWifi = loadOnlyWifi,
                     requestSize = bounds,
+                    persistIdentity = galleryIdentity,
                 )
             }
 
@@ -288,6 +296,8 @@ internal fun BookCoverTextOverlay(
  *
  * @param centerCrop 请求是否 centerCrop；瀑布流等自由比例场景传 false，
  *   保持图片原始宽高比（对齐 View 版 CoverLoader 的 fixedRatio = false）
+ * @param persistIdentity 封面持久化身份（书籍传 bookUrl）：非空且加载来源为网络/磁盘时，
+ *   将封面原始字节持久化到本地，供断网后经 [BookCover.getStableCover] 回退加载
  */
 internal suspend fun loadCoverDrawable(
     context: Context,
@@ -296,10 +306,19 @@ internal suspend fun loadCoverDrawable(
     loadOnlyWifi: Boolean,
     requestSize: IntSize,
     centerCrop: Boolean = true,
+    persistIdentity: String? = null,
 ): Drawable? {
     repeat(COVER_LOAD_ATTEMPTS) { attempt ->
         val loaded = withTimeoutOrNull(COVER_LOAD_TIMEOUT_MS) {
-            loadCoverDrawableOnce(context, path, sourceOrigin, loadOnlyWifi, requestSize, centerCrop)
+            loadCoverDrawableOnce(
+                context = context,
+                path = path,
+                sourceOrigin = sourceOrigin,
+                loadOnlyWifi = loadOnlyWifi,
+                requestSize = requestSize,
+                centerCrop = centerCrop,
+                persistIdentity = persistIdentity,
+            )
         }
         if (loaded != null) return loaded
         if (attempt < COVER_LOAD_ATTEMPTS - 1) delay(COVER_LOAD_RETRY_DELAY_MS)
@@ -315,6 +334,7 @@ private suspend fun loadCoverDrawableOnce(
     loadOnlyWifi: Boolean,
     requestSize: IntSize,
     centerCrop: Boolean,
+    persistIdentity: String? = null,
 ): Drawable? = suspendCancellableCoroutine { cont ->
     // 先在协程存活时取到 RequestManager：取消回调里 Activity 可能已 destroy，
     // 那时再 Glide.with(context) 会抛 "You cannot start a load for a destroyed activity"
@@ -350,6 +370,30 @@ private suspend fun loadCoverDrawableOnce(
     // override 返回的是同一个 RequestBuilder（原地修改），这里回写只是让 CheckResult 告警消失
     if (!AppConfig.loadCoverHighQuality) {
         builder = builder.override(requestSize.width, requestSize.height)
+    }
+    if (persistIdentity != null) {
+        builder = builder.addListener(object : RequestListener<Drawable> {
+            override fun onLoadFailed(
+                e: GlideException?,
+                model: Any?,
+                target: Target<Drawable?>,
+                isFirstResource: Boolean,
+            ): Boolean = false
+
+            override fun onResourceReady(
+                resource: Drawable,
+                model: Any,
+                target: Target<Drawable?>?,
+                dataSource: DataSource,
+                isFirstResource: Boolean,
+            ): Boolean {
+                // 内存缓存命中不重复写盘；网络/磁盘来源触发持久化
+                if (dataSource != DataSource.MEMORY_CACHE) {
+                    BookCover.persistCover(persistIdentity, path)
+                }
+                return false
+            }
+        })
     }
     builder.into(target)
 }

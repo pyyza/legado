@@ -115,6 +115,8 @@ class CoverImageView @JvmOverloads constructor(
     private var nameHeight = 0f
     private var authorHeight = 0f
     private var isHtmlCover = false
+    /** 持久化封面身份（bookUrl），仅当本次加载的是 http(s) 远程封面时设置 */
+    private var persistIdentity: String? = null
     private val drawBookName = BookCover.drawBookName
     private val drawBookAuthor by lazy { BookCover.drawBookAuthor }
 
@@ -331,6 +333,10 @@ class CoverImageView @JvmOverloads constructor(
                 currentJob?.cancel()
                 currentJob = null
                 needNameBitmap.remove(bitmapPath.toString())
+                // 内存缓存命中不重复写盘；网络/磁盘来源触发持久化，断网后可从本地封面加载
+                if (dataSource != DataSource.MEMORY_CACHE) {
+                    BookCover.persistCover(persistIdentity, bitmapPath)
+                }
                 invalidate()
                 return false
             }
@@ -435,8 +441,10 @@ class CoverImageView @JvmOverloads constructor(
             galleryIdentity ?: listOfNotNull(sourceOrigin, path, name, author).joinToString("|"),
             path,
         )
-        val actualPath = galleryDefaultCover ?: path
+        // 本地持久化封面优先：封面 URL 带时效签名轮换后，离线仍可从本地文件加载
+        val actualPath = galleryDefaultCover ?: BookCover.getStableCover(galleryIdentity, path)
         this.bitmapPath = actualPath
+        persistIdentity = if (actualPath?.startsWith("http") == true) galleryIdentity else null
 
         // 检查是否启用HTML封面生成（由封面配置页的开关控制）
         if (galleryDefaultCover == null && currentName != null && HtmlCoverRenderer.isApplicable(currentName)) {

@@ -39,8 +39,10 @@ fun HomepageBookCover(
     val galleryDefaultCover = BookCover.getGalleryDefaultCover(identity, coverUrl)
     val useDefaultCover = AppConfig.useDefaultCover
     val coverShadowEnabled = AppConfig.bookCoverShadow
-    // 图集默认封面优先于 useDefaultCover，使每本书获得随机图集封面
-    val displayCover = galleryDefaultCover ?: if (useDefaultCover) null else coverUrl
+    // 图集默认封面优先于 useDefaultCover，使每本书获得随机图集封面；
+    // 其后本地持久化封面优先，封面 URL 带时效签名轮换后离线仍可加载
+    val displayCover = galleryDefaultCover
+        ?: if (useDefaultCover) null else BookCover.getStableCover(identity, coverUrl)
     val shouldDrawName = (galleryDefaultCover == null && useDefaultCover || coverUrl == null) && BookCover.drawBookName
 
     Box(

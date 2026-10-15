@@ -34,13 +34,22 @@ import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.utils.BitmapUtils
+import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
+import io.legado.app.utils.MD5Utils
+import io.legado.app.utils.externalFiles
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefString
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.launch
 import splitties.init.appCtx
 import java.io.File
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import androidx.core.graphics.drawable.toDrawable
 
 /**
@@ -67,6 +76,15 @@ object BookCover {
     private const val coverRuleConfigKey = "legadoCoverRuleConfig"
     private val coverGalleryRepository by lazy { CoverGalleryRepository() }
 
+    /** 持久化封面最小间隔：30 分钟内同一本书不重复写盘 */
+    private const val persistIntervalMillis = 30 * 60 * 1000L
+
+    /** 进行中的持久化任务 key（identity），避免并发放写同一文件 */
+    private val persistingKeys: MutableSet<String> = Collections.newSetFromMap(ConcurrentHashMap())
+
+    /** 上次持久化完成时间（identity -> epoch millis） */
+    private val lastPersistTime = ConcurrentHashMap<String, Long>()
+
     const val configFileName = "coverRule.json"
 
     var drawBookName = true
@@ -87,10 +105,11 @@ object BookCover {
         return coverGalleryRepository.getDefaultCoverPath(identity, originalCoverPath)
     }
 
-    /** 获取书籍展示封面：优先封面图集，回退到原始封面 */
+    /** 获取书籍展示封面：优先封面图集，其次本地持久化封面，回退到原始封面 */
     fun getDisplayCover(book: Book): String? {
         val originalCover = book.getDisplayCover()
-        return getGalleryDefaultCover(book.bookUrl, originalCover) ?: originalCover
+        return getGalleryDefaultCover(book.bookUrl, originalCover)
+            ?: getStableCover(book.bookUrl, originalCover)
     }
 
     /** 获取搜索结果书籍的展示封面：优先封面图集，回退到原始封面 */
@@ -105,6 +124,75 @@ object BookCover {
             append(searchBook.author)
         }
         return getGalleryDefaultCover(identity, searchBook.coverUrl) ?: searchBook.coverUrl
+    }
+
+    /**
+     * 获取离线可用的封面路径：本地持久化封面优先，无持久化时原样返回。
+     *
+     * 部分书源的封面 URL 带时效签名（token/expire 随刷新轮换），签名一换
+     * Glide 磁盘缓存的键就失配，离线时必然加载失败。持久化封面以 bookUrl
+     * 为键，不受签名轮换影响，断网后仍可加载。
+     *
+     * @param identity 书籍身份（bookUrl），用于查找本地持久化封面
+     * @param coverUrl 原始封面路径或 URL；非 http(s) 直接原样返回
+     */
+    fun getStableCover(identity: String?, coverUrl: String?): String? {
+        if (coverUrl.isNullOrEmpty() || identity.isNullOrEmpty()) {
+            return coverUrl
+        }
+        // "|" 是搜索/聚合结果的组合身份，非单本书籍，不参与持久化
+        if (identity.contains("|") || !coverUrl.startsWith("http")) {
+            return coverUrl
+        }
+        val localPath = getLocalCoverPath(identity)
+        return if (File(localPath).isFile) localPath else coverUrl
+    }
+
+    /**
+     * 异步持久化封面到本地（保存原始图片字节，与显示请求共用 Glide 磁盘缓存）。
+     *
+     * 通过 Glide downloadOnly 取原始字节（DiskCacheStrategy.DATA，通常命中磁盘缓存，
+     * 不产生二次网络请求），复制到 covers 目录，文件名为 identity（bookUrl）的 md5。
+     * 仅接受 http(s) 的 identity 与 coverUrl；失败静默（不影响展示）。
+     *
+     * @param identity 书籍身份（bookUrl）
+     * @param coverUrl 已成功加载的封面 URL
+     */
+    fun persistCover(identity: String?, coverUrl: String?) {
+        if (identity.isNullOrBlank() || coverUrl.isNullOrBlank()) return
+        if (!identity.startsWith("http") || !coverUrl.startsWith("http")) return
+        if (identity.contains("|")) return
+        lastPersistTime[identity]?.let {
+            if (System.currentTimeMillis() - it < persistIntervalMillis) return
+        }
+        if (!persistingKeys.add(identity)) return
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val source = Glide.with(appCtx)
+                    .downloadOnly()
+                    .diskCacheStrategy(DiskCacheStrategy.DATA)
+                    .load(coverUrl)
+                    .submit()
+                    .get(15, TimeUnit.SECONDS)
+                val target = File(getLocalCoverPath(identity))
+                target.parentFile?.mkdirs()
+                source.copyTo(target, overwrite = true)
+                lastPersistTime[identity] = System.currentTimeMillis()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                persistingKeys.remove(identity)
+            }
+        }
+    }
+
+    /** 本地持久化封面路径（covers 目录，与 LocalBook.getCoverPath 同目录同命名规则） */
+    private fun getLocalCoverPath(identity: String): String {
+        return FileUtils.getPath(
+            appCtx.externalFiles,
+            "covers",
+            "${MD5Utils.md5Encode16(identity)}.jpg"
+        )
     }
 
     /**
